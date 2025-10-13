@@ -28,11 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="log4net_wServer.config" CopyToOutputDirectory="PreserveNewest" />
     <EmbeddedResource Include="realm\worlds\maps\**\*" />
-    <None Update="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
 
   <ItemGroup>

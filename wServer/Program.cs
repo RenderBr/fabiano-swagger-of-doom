@@ -32,18 +32,29 @@ internal class Program
 
     private static async Task Main(string[] args)
     {
-        Console.Title = "RealmRage - World Server";
+        Console.Title = "RealmRage - World Server v" + Server.VERSION;
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
         try
         {
+            if (!File.Exists("appsettings.json"))
+            {
+                var defaultConfig = new WorldServerConfiguration();
+                var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, new System.Text.Json.JsonSerializerOptions
+                { WriteIndented = true });
+                await File.WriteAllTextAsync("appsettings.json", json);
+                Console.WriteLine("Default configuration file created. Please review 'appsettings.json' and restart the server.");
+                Console.ReadKey();
+                return;
+            }
+            
             var configBuilder = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
             var configuration = configBuilder.Build();
-            
+
             Config = configuration.Get<WorldServerConfiguration>();
 
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
@@ -58,14 +69,6 @@ internal class Program
             {
                 builder.ClearProviders();
 
-                builder.AddSimpleConsole(options =>
-                {
-                    options.SingleLine = true;
-                    options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
-                    options.IncludeScopes = false;
-                    options.UseUtcTimestamp = true;
-                });
-                
                 if (!Enum.TryParse(Config.Logging.LogLevel, true, out LogLevel logLevel))
                 {
                     logLevel = LogLevel.Information;
@@ -75,7 +78,13 @@ internal class Program
 
                 if (Config.Logging.EnableConsole)
                 {
-                    builder.AddConsole();
+                    builder.AddSimpleConsole(options =>
+                    {
+                        options.SingleLine = true;
+                        options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
+                        options.IncludeScopes = true;
+                        options.UseUtcTimestamp = true;
+                    });
                 }
 
                 if (Config.Logging.EnableDebug)
@@ -106,9 +115,9 @@ internal class Program
             serviceBuilder.AddScoped<IPetRepository, PetRepository>();
             serviceBuilder.AddScoped<IVaultRepository, VaultRepository>();
             serviceBuilder.AddScoped<IStatRepository, StatRepository>();
-            
+
             serviceBuilder.AddSingleton<XmlDataService>();
-            
+
             serviceBuilder.Configure<RealmConfiguration>(configuration.GetSection("Realm"));
             serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
             serviceBuilder.AddSingleton<RealmManager>();

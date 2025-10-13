@@ -30,10 +30,9 @@ namespace wServer.networking
 
     public class Client : IDisposable
     {
-        public const string SERVER_VERSION = "1.0.3.0";
         private bool disposed;
 
-        private static readonly ILogger log = Program.Services?.GetRequiredService<ILogger<Client>>();
+        private static readonly ILogger Log = Program.Services?.GetRequiredService<ILogger<Client>>();
 
         public uint UpdateAckCount = 0;
 
@@ -44,9 +43,8 @@ namespace wServer.networking
             Socket = skt;
             Manager = manager;
             ReceiveKey =
-                new RC4(new byte[] { 0x31, 0x1f, 0x80, 0x69, 0x14, 0x51, 0xc7, 0x1d, 0x09, 0xa1, 0x3a, 0x2a, 0x6e });
-            SendKey = new RC4(new byte[]
-                { 0x72, 0xc5, 0x58, 0x3c, 0xaf, 0xb6, 0x81, 0x89, 0x95, 0xcd, 0xd7, 0x4b, 0x80 });
+                new RC4([0x31, 0x1f, 0x80, 0x69, 0x14, 0x51, 0xc7, 0x1d, 0x09, 0xa1, 0x3a, 0x2a, 0x6e]);
+            SendKey = new RC4([0x72, 0xc5, 0x58, 0x3c, 0xaf, 0xb6, 0x81, 0x89, 0x95, 0xcd, 0xd7, 0x4b, 0x80]);
             BeginProcess();
         }
 
@@ -72,7 +70,7 @@ namespace wServer.networking
 
         public void BeginProcess()
         {
-            log?.LogInformation("Received client @ {endPoint}", Socket.RemoteEndPoint);
+            Log?.LogInformation("Received client @ {endPoint}", Socket.RemoteEndPoint);
             handler = new NetworkHandler(this, Socket);
             handler.BeginHandling();
         }
@@ -81,10 +79,10 @@ namespace wServer.networking
         {
             if (Stage == ProtocalStage.Disconnected || Socket == null || !Socket.Connected)
                 return;
-            
+
             if (pkt.ID != PacketID.MOVE && pkt.ID != PacketID.NEWTICK)
             {
-                log?.LogInformation("Sending packet '{packetId}' to {endPoint}", pkt.ID, Socket.RemoteEndPoint);
+                Log?.LogInformation("Sending packet '{packetId}' to {endPoint}", pkt.ID, Socket.RemoteEndPoint);
             }
 
             handler?.SendPacket(pkt);
@@ -108,13 +106,13 @@ namespace wServer.networking
             {
                 if (pkt.ID != PacketID.MOVE)
                 {
-                    log?.LogInformation("Handling packet '{packetId}'...", pkt.ID);
+                    Log?.LogInformation("Handling packet '{packetId}'...", pkt.ID);
                 }
 
                 if (pkt.ID == (PacketID)255) return;
                 IPacketHandler handler;
                 if (!PacketHandlers.Handlers.TryGetValue(pkt.ID, out handler))
-                    log?.LogWarning("Unhandled packet '{packetId}'", pkt.ID);
+                    Log?.LogWarning("Unhandled packet '{packetId}'", pkt.ID);
                 else
                 {
                     await handler.Handle(this, (ClientPacket)pkt).ConfigureAwait(false);
@@ -122,7 +120,7 @@ namespace wServer.networking
             }
             catch (Exception e)
             {
-                log?.LogError(e, "Error when handling packet '{packetId}'...", pkt.ID);
+                Log?.LogError(e, "Error when handling packet '{packetId}'...", pkt.ID);
                 Disconnect();
             }
         }
@@ -135,7 +133,7 @@ namespace wServer.networking
                 Stage = ProtocalStage.Disconnected;
 
                 handler?.Stop();
-                
+
                 if (Socket.Connected)
                 {
                     try
@@ -148,7 +146,7 @@ namespace wServer.networking
 
                     Socket.Close();
                 }
-                
+
                 handler?.Dispose();
 
                 if (Account != null)
@@ -156,7 +154,7 @@ namespace wServer.networking
             }
             catch (Exception e)
             {
-                log?.LogError(e, "Error during client disconnect");
+                Log?.LogError(e, "Error during client disconnect");
             }
         }
 
@@ -187,7 +185,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    log?.LogCritical(ex, "SaveException");
+                    Log?.LogCritical(ex, "SaveException");
                 }
             });
         }
@@ -204,7 +202,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    log?.LogError(ex, "Error during disconnect from realm");
+                    Log?.LogError(ex, "Error during disconnect from realm");
                 }
             }, PendingPriority.Destruction);
         }
@@ -220,7 +218,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    log?.LogError(ex, "Error during reconnect");
+                    Log?.LogError(ex, "Error during reconnect");
                 }
             }, PendingPriority.Destruction);
         }

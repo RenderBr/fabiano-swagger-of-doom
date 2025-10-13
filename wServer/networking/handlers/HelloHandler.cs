@@ -29,11 +29,11 @@ namespace wServer.networking.handlers
         protected override async Task HandlePacket(Client client, HelloPacket packet)
         {
             var log = Program.Services.GetRequiredService<ILogger<HelloHandler>>();
-            if (Client.SERVER_VERSION != packet.BuildVersion)
+            if (Server.VERSION != packet.BuildVersion)
             {
                 log.LogWarning(
                     "HELLO mismatch check: client version '{PacketBuildVersion}', server version '{ServerVersion}'",
-                    packet.BuildVersion, Client.SERVER_VERSION);
+                    packet.BuildVersion, Server.VERSION);
                 client.SendPacket(new FailurePacket
                 {
                     ErrorId = 0,
@@ -42,7 +42,7 @@ namespace wServer.networking.handlers
                 client.SendPacket(new FailurePacket
                 {
                     ErrorId = 4,
-                    ErrorDescription = Client.SERVER_VERSION
+                    ErrorDescription = Server.VERSION
                 });
                 client.Disconnect();
                 return;

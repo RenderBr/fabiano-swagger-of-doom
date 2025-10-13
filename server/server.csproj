@@ -31,12 +31,8 @@
     <None Include="app\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="php\**\*" CopyToOutputDirectory="PreserveNewest" />
     <None Include="sfx\**\*" CopyToOutputDirectory="Always" />
-    <None Include="log4net_server.config" CopyToOutputDirectory="PreserveNewest" />
     <None Include="init.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="appsettings.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 

@@ -43,6 +43,17 @@ namespace server
 
         public static async Task Main(string[] args)
         {
+            if (!File.Exists("appsettings.json"))
+            {
+                var defaultConfig = new WebServerConfiguration();
+                var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, new System.Text.Json.JsonSerializerOptions
+                    { WriteIndented = true });
+                await File.WriteAllTextAsync("appsettings.json", json);
+                Console.WriteLine("Default configuration file created. Please review 'appsettings.json' and restart the server.");
+                Console.ReadKey();
+                return;
+            }
+            
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
             Directory.SetCurrentDirectory(AppContext.BaseDirectory);
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;

@@ -15,6 +15,7 @@ namespace wServer.networking
 {
     internal class Server : IDisposable
     {
+        public const string VERSION = "1.0.3.0";
         private readonly ILogger<Server> _logger;
         private bool _running;
 
@@ -98,5 +99,6 @@ namespace wServer.networking
             _running = false;
             Socket?.Dispose();
         }
+
     }
 }
