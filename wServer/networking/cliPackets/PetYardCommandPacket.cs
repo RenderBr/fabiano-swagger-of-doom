@@ -22,7 +22,7 @@ namespace wServer.networking.cliPackets
 
         public override PacketID ID
         {
-            get { return PacketID.PETYARDCOMMAND; }
+            get { return PacketID.PETYARDUPDATE; }
         }
 
         public override Packet CreateInstance()

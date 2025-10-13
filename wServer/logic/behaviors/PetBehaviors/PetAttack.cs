@@ -1,4 +1,5 @@
-﻿using wServer.realm;
+﻿using RageRealm.Shared.Models;
+using wServer.realm;
 
 namespace wServer.logic.behaviors.PetBehaviors
 {

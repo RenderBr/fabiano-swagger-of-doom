@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -15,7 +16,7 @@ namespace wServer.logic.behaviors
 
         public CopyLootState(string children, double radius = 10)
         {
-            this.children = BehaviorDb.InitGameData.IdToObjectType[children];
+            this.children = BehaviorDb.InitGameDataService.IdToObjectType[children];
             this.radius = radius;
         }
 

@@ -1,5 +1,6 @@
 ﻿#region
 
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion

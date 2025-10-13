@@ -6,7 +6,12 @@ using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
 using System.Net;
+using System.Threading.Tasks;
 using System.Web;
+using db.Models;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 #endregion
 
@@ -17,7 +22,7 @@ namespace server
         protected NameValueCollection Query { get; private set; }
         protected HttpListenerContext Context { get; private set; }
 
-        public void HandleRequest(HttpListenerContext context)
+        public async Task HandleRequest(HttpListenerContext context)
         {
             this.Context = context;
             if (ParseQueryString())
@@ -31,22 +36,34 @@ namespace server
                     string currurl = context.Request.RawUrl;
                     int iqs = currurl.IndexOf('?');
                     if (iqs >= 0)
-                        Query = HttpUtility.ParseQueryString((iqs < currurl.Length - 1) ? currurl.Substring(iqs + 1) : string.Empty);
+                        Query = HttpUtility.ParseQueryString((iqs < currurl.Length - 1)
+                            ? currurl.Substring(iqs + 1)
+                            : string.Empty);
                 }
             }
 
-            HandleRequest();
+            // Log query
+            foreach (string key in Query.AllKeys)
+                Program.Logger.LogDebug("{Key}: {S}", key, Query[key]);
+
+
+            await HandleRequest();
         }
 
-        public bool CheckAccount(Account acc, Database db, bool checkAccInUse=true)
+        public async Task<bool> CheckAccount(Account acc, bool checkAccInUse = true)
         {
-            if (acc == null && !String.IsNullOrWhiteSpace(Query["password"]))
+            using var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+
+            if (acc == null && !string.IsNullOrWhiteSpace(Query["password"]))
             {
                 WriteErrorLine("Account credentials not valid");
                 return false;
             }
-            else if (acc == null && String.IsNullOrWhiteSpace(Query["password"]))
+            else if (acc == null && string.IsNullOrWhiteSpace(Query["password"]))
+            {
                 return true;
+            }
 
             if (acc.Banned)
             {
@@ -55,22 +72,19 @@ namespace server
                 Context.Response.Close();
                 return false;
             }
+
             if (checkAccInUse)
             {
-                int? timeout = 0;
-                if (db.CheckAccountInUse(acc, ref timeout))
+                if (await accountService.CheckAccountInUse(acc))
                 {
-                    if (timeout != null)
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.WriteLine("<Error>Account in use. (" + timeout + " seconds until timeout.)</Error>");
-                    else
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.WriteLine("<Error>Account in use.</Error>");
+                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                        wtr.WriteLine("<Error>Account in use.</Error>");
 
                     Context.Response.Close();
                     return false;
                 }
             }
+
             return true;
         }
 
@@ -89,7 +103,7 @@ namespace server
 
         protected virtual bool ParseQueryString() => true;
 
-        protected abstract void HandleRequest();
+        protected abstract Task HandleRequest();
     }
 
     //internal class RequestHandlers

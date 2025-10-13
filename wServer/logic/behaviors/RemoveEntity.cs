@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 namespace wServer.logic.behaviors
@@ -22,7 +23,7 @@ namespace wServer.logic.behaviors
         {
             Entity[] ens = host.GetNearestEntities(dist).ToArray();
             foreach (Entity e in ens)
-                if (e.ObjectType == host.Manager.GameData.IdToObjectType[children])
+                if (e.ObjectType == host.Manager.GameDataService.IdToObjectType[children])
                     host.Owner.LeaveWorld(e);
         } 
 

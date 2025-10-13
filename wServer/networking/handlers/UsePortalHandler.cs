@@ -1,6 +1,10 @@
 ﻿#region
 using System;
 using System.Globalization;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -19,9 +23,9 @@ namespace wServer.networking.handlers
             get { return PacketID.USEPORTAL; }
         }
 
-        protected override void HandlePacket(Client client, UsePortalPacket packet)
+        protected override Task HandlePacket(Client client, UsePortalPacket packet)
         {
-            if (client.Player.Owner == null) return;
+            if (client.Player.Owner == null) return Task.CompletedTask;
 
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -114,7 +118,7 @@ namespace wServer.networking.handlers
                                     {
                                         client.Player.SendError("Error while creating world instance:");
                                         client.Player.SendError(ex.ToString());
-                                        log.Error(ex);
+                                        Program.Services.GetRequiredService<ILogger<UsePortalHandler>>().LogError(ex, "Error while creating world instance");
                                     }
                                 }
                                 else
@@ -146,13 +150,14 @@ namespace wServer.networking.handlers
                     client.Reconnect(new ReconnectPacket
                     {
                         Host = "",
-                        Port = Program.Settings.GetValue<int>("port"),
+                        Port = Program.Config.Realm.ServerPort,
                         GameId = world.Id,
                         Name = world.Name,
                         Key = world.PortalKey,
                     });
                 }
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
     }
 }

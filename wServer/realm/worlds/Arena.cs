@@ -2,6 +2,9 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -116,7 +119,7 @@ namespace wServer.realm.worlds
                 Random r2 = new Random();
                 foreach (string i in enems)
                 {
-                    ushort id = Manager.GameData.IdToObjectType[i];
+                    ushort id = Manager.GameDataService.IdToObjectType[i];
                     int xloc = r2.Next(10, Map.Width) - 6;
                     int yloc = r2.Next(10, Map.Height) - 6;
                     Entity enemy = Entity.Resolve(Manager, id);
@@ -126,7 +129,7 @@ namespace wServer.realm.worlds
             }
             catch (Exception ex)
             {
-                Log.Error(ex);
+                Program.Services.GetRequiredService<ILogger<Arena>>().LogError(ex, "Error Spawning Enemies in Arena");
             }
         }
 

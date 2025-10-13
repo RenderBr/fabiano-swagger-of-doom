@@ -1,16 +1,14 @@
 ﻿#region
 
 using System;
-using System.Collections.Specialized;
 using System.Globalization;
-using System.IO;
-using System.Net;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Web;
-using db;
-using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
 using System.Net.Mail;
+using db.Models;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -18,75 +16,85 @@ namespace server.account
 {
     internal class register : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            if (Query["ignore"] == null || !String.IsNullOrWhiteSpace(Query["entrytag"]) || String.IsNullOrWhiteSpace(Query["isAgeVerified"]) || !Query["newGUID"].Contains("@"))
+            if (Query["ignore"] == null || !String.IsNullOrWhiteSpace(Query["entrytag"]) || !Query["newGUID"].Contains('@'))
             {
-                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                    wtr.Write("<Error>WebRegister.invalid_email_address</Error>");
+                WriteErrorLine("WebRegister.invalid_email_address");
                 return;
             }
 
-            if (Query.AllKeys.Length != 6)
+            if (String.IsNullOrWhiteSpace(Query["isAgeVerified"]))
             {
-                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                    wtr.Write("<Error>WebRegister.invalid_email_address</Error>");
+                WriteErrorLine("WebRegister.invalid_birthdate");
                 return;
             }
 
             if(!IsValidEmail(Query["newGuid"]))
             {
-                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                    wtr.Write("<Error>WebRegister.invalid_email_address</Error>");
+                WriteErrorLine("WebRegister.invalid_email_address");
                 return;
             }
 
-            using (Database db = new Database())
-            {
-                byte[] status;
-                if (!IsValidEmail(Query["newGUID"]))
-                    status = Encoding.UTF8.GetBytes("<Error>WebForgotPasswordDialog.emailError</Error>");
-                if (db.HasUuid(Query["guid"]) &&
-                    !db.Verify(Query["guid"], "", Program.GameData).IsGuestAccount)
-                {
-                    if (db.HasUuid(Query["newGUID"]))
-                        status = Encoding.UTF8.GetBytes("<Error>Error.emailAlreadyUsed</Error>");
-                    else
-                    {
-                        MySqlCommand cmd = db.CreateQuery();
-                        cmd.CommandText =
-                            "UPDATE accounts SET uuid=@newUuid, name=@newUuid, password=SHA1(@password), guest=FALSE WHERE uuid=@uuid, name=@name;";
-                        cmd.Parameters.AddWithValue("@uuid", Query["guid"]);
-                        cmd.Parameters.AddWithValue("@newUuid", Query["newGUID"]);
-                        cmd.Parameters.AddWithValue("@password", Query["newPassword"]);
+            using var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
 
-                        if (cmd.ExecuteNonQuery() > 0)
-                            status = Encoding.UTF8.GetBytes("<Success />");
-                        else
-                            status = Encoding.UTF8.GetBytes("<Error>Error.emailAlreadyUsed</Error>");
-                    }
+            if (!IsValidEmail(Query["newGUID"]))
+            {
+                WriteErrorLine("WebForgotPasswordDialog.emailError");
+                return;
+            }
+
+            var existingGuidAccount = await accountRepository.GetByUuidAsync(Query["guid"]);
+            if (existingGuidAccount != null && !existingGuidAccount.Guest)
+            {
+                var newGuidAccount = await accountRepository.GetByUuidAsync(Query["newGUID"]);
+                if (newGuidAccount != null)
+                {
+                    WriteErrorLine("Error.emailAlreadyUsed");
+                    return;
                 }
                 else
                 {
-                    Account acc = db.Register(Query["newGUID"], Query["newPassword"], false, Program.GameData);
-                    if (acc != null)
-                    {
-                        if (Program.Settings.GetValue<bool>("verifyEmail"))
-                        {
-                            MailMessage message = new MailMessage();
-                            message.To.Add(Query["newGuid"]);
-                            message.IsBodyHtml = true;
-                            message.Subject = "Please verify your account.";
-                            message.From = new MailAddress(Program.Settings.GetValue<string>("serverEmail", ""));
-                            message.Body = "<center>Please verify your email via this <a href=\"" + Program.Settings.GetValue<string>("serverDomain", "localhost") + "/account/validateEmail?authToken=" + acc.AuthToken + "\" target=\"_blank\">link</a>.</center>";
-                            Program.SendEmail(message, true);
-                        }
-                        status = Encoding.UTF8.GetBytes("<Success/>");
-                    }
-                    else
-                        status = Encoding.UTF8.GetBytes("<Error>Error.emailAlreadyUsed</Error>");
+                    // Upgrade guest account
+                    existingGuidAccount.Uuid = Query["newGUID"];
+                    existingGuidAccount.Name = Query["name"];
+                    existingGuidAccount.Password = Utils.Sha1(Query["newPassword"]);
+                    existingGuidAccount.Guest = false;
+                    await accountRepository.SaveChangesAsync();
+                    WriteLine("<Success />");
+                    return;
                 }
-                Context.Response.OutputStream.Write(status, 0, status.Length);
+            }
+            else
+            {
+                // Create new account
+                var newAccount = new Account
+                {
+                    Uuid = Query["newGUID"],
+                    Password = Utils.Sha1(Query["newPassword"]),
+                    Name = Query["newGUID"],
+                    Guest = false,
+                    AuthToken = Guid.NewGuid().ToString(),
+                    RegTime = DateTime.Now,
+                    LastSeen = DateTime.Now
+                };
+
+                await accountRepository.AddAsync(newAccount);
+                await accountRepository.SaveChangesAsync();
+
+                if (Program.Config.VerifyEmail)
+                {
+                    MailMessage message = new MailMessage();
+                    message.To.Add(Query["newGuid"]);
+                    message.IsBodyHtml = true;
+                    message.Subject = "Please verify your account.";
+                    message.From = new MailAddress(Program.Config.Smtp.Email);
+                    message.Body = "<center>Please verify your email via this <a href=\"" + Program.Config.ServerDomain + "/account/validateEmail?authToken=" + newAccount.AuthToken + "\" target=\"_blank\">link</a>.</center>";
+                    await Program.SendEmailAsync(message, true);
+                }
+                WriteLine("<Success/>");
             }
         }
 

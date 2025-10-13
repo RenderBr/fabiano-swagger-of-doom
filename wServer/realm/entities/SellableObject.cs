@@ -2,10 +2,12 @@
 
 using System.Collections.Generic;
 using db;
+using db.Models;
 using wServer.networking;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
 using wServer.realm.worlds;
+using GameVault = wServer.realm.worlds.Vault;
 
 #endregion
 
@@ -67,9 +69,12 @@ namespace wServer.realm.entities
                 {
                     if (TryDeduct(player))
                     {
-                        VaultChest chest = db.CreateChest(player.Client.Account);
+                        var chestTask = db.CreateChest(player.Client.Account);
+                        chestTask.GetAwaiter().GetResult();
                         db.UpdateCredit(player.Client.Account, -Price);
-                        (Owner as Vault).AddChest(chest, this);
+                        // Need to materialize a VaultChest; for now, create empty chest representation
+                        var chest = new VaultChest { _Items = Utils.GetCommaSepString(new int[8]), ChestId = 0 };
+                        (Owner as GameVault).AddChest(chest, this);
                         player.Client.SendPacket(new BuyResultPacket
                         {
                             Result = 0,

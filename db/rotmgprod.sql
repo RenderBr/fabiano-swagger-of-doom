@@ -1,393 +1,412 @@
--- phpMyAdmin SQL Dump
--- version 4.0.2
--- http://www.phpmyadmin.net
---
--- Host: localhost
--- Erstellungszeit: 10. Mai 2015 um 10:43
--- Server Version: 5.5.16
--- PHP-Version: 5.3.8
+-- Modern MySQL Database Schema
+-- Compatible with MySQL 8.0+
+-- Updated: October 2025
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 SET time_zone = "+00:00";
 
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8 */;
-
 --
--- Datenbank: `rotmgprod`
+-- Database: `rotmgprod`
 --
-CREATE DATABASE IF NOT EXISTS `rotmgprod` DEFAULT CHARACTER SET latin1 COLLATE latin1_swedish_ci;
+CREATE DATABASE IF NOT EXISTS `rotmgprod` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `rotmgprod`;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `accounts`
+-- Table structure for `accounts`
 --
 
 CREATE TABLE IF NOT EXISTS `accounts` (
-  `id` bigint(255) NOT NULL AUTO_INCREMENT,
-  `uuid` varchar(128) NOT NULL,
-  `password` varchar(256) NOT NULL,
-  `name` varchar(64) NOT NULL DEFAULT 'DEFAULT',
-  `rank` int(1) NOT NULL DEFAULT '0',
-  `namechosen` tinyint(1) NOT NULL DEFAULT '0',
-  `verified` tinyint(1) NOT NULL DEFAULT '1',
-  `guild` int(11) NOT NULL,
-  `guildRank` int(11) NOT NULL,
-  `guildFame` int(11) NOT NULL DEFAULT '0',
-  `lastip` varchar(128) NOT NULL DEFAULT '',
-  `vaultCount` int(11) NOT NULL DEFAULT '1',
-  `maxCharSlot` int(11) NOT NULL DEFAULT '2',
-  `regTime` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `guest` tinyint(1) NOT NULL DEFAULT '0',
-  `banned` tinyint(1) NOT NULL DEFAULT '0',
-  `publicMuledump` int(1) NOT NULL DEFAULT '1',
-  `muted` tinyint(1) NOT NULL,
-  `prodAcc` tinyint(1) NOT NULL DEFAULT '0',
-  `locked` varchar(512) NOT NULL,
-  `ignored` varchar(512) NOT NULL,
-  `gifts` varchar(10000) NOT NULL DEFAULT '',
-  `isAgeVerified` tinyint(1) NOT NULL DEFAULT '0',
-  `petYardType` int(11) NOT NULL DEFAULT '1',
-  `ownedSkins` varchar(2048) NOT NULL,
-  `authToken` varchar(128) NOT NULL DEFAULT '',
-  `acceptedNewTos` tinyint(1) NOT NULL DEFAULT '1',
-  `lastSeen` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `accountInUse` tinyint(1) NOT NULL,
-  PRIMARY KEY (`id`,`uuid`,`guild`,`lastip`,`banned`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `uuid` VARCHAR(128) NOT NULL,
+  `password` VARCHAR(256) NOT NULL,
+  `name` VARCHAR(64) NOT NULL DEFAULT 'DEFAULT',
+  `rank` TINYINT UNSIGNED NOT NULL DEFAULT '0',
+  `namechosen` BOOLEAN NOT NULL DEFAULT FALSE,
+  `verified` BOOLEAN NOT NULL DEFAULT TRUE,
+  `guild` INT UNSIGNED NOT NULL DEFAULT 0,
+  `guildRank` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  `guildFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `lastip` VARCHAR(45) NOT NULL DEFAULT '',
+  `vaultCount` TINYINT UNSIGNED NOT NULL DEFAULT '1',
+  `maxCharSlot` TINYINT UNSIGNED NOT NULL DEFAULT '2',
+  `regTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `guest` BOOLEAN NOT NULL DEFAULT FALSE,
+  `banned` BOOLEAN NOT NULL DEFAULT FALSE,
+  `publicMuledump` BOOLEAN NOT NULL DEFAULT TRUE,
+  `muted` BOOLEAN NOT NULL DEFAULT FALSE,
+  `prodAcc` BOOLEAN NOT NULL DEFAULT FALSE,
+  `locked` TEXT,
+  `ignored` TEXT,
+  `gifts` TEXT,
+  `isAgeVerified` BOOLEAN NOT NULL DEFAULT FALSE,
+  `petYardType` TINYINT UNSIGNED NOT NULL DEFAULT '1',
+  `ownedSkins` TEXT,
+  `authToken` VARCHAR(128) NOT NULL DEFAULT '',
+  `acceptedNewTos` BOOLEAN NOT NULL DEFAULT TRUE,
+  `lastSeen` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `accountInUse` BOOLEAN NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  KEY `idx_guild` (`guild`),
+  KEY `idx_lastip` (`lastip`),
+  KEY `idx_banned` (`banned`),
+  KEY `idx_lastseen` (`lastSeen`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `arenalb`
+-- Table structure for `arenalb`
 --
 
 CREATE TABLE IF NOT EXISTS `arenalb` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `wave` int(11) NOT NULL,
-  `accid` int(11) NOT NULL,
-  `charid` int(11) NOT NULL,
-  `petid` int(11) DEFAULT NULL,
-  `time` varchar(256) NOT NULL,
-  `date` datetime NOT NULL,
-  PRIMARY KEY (`id`,`wave`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `wave` SMALLINT UNSIGNED NOT NULL,
+  `accid` BIGINT UNSIGNED NOT NULL,
+  `charid` INT UNSIGNED NOT NULL,
+  `petid` INT UNSIGNED DEFAULT NULL,
+  `time` VARCHAR(256) NOT NULL,
+  `date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_wave` (`wave`),
+  KEY `idx_accid` (`accid`),
+  KEY `idx_date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `backpacks`
+-- Table structure for `backpacks`
 --
 
 CREATE TABLE IF NOT EXISTS `backpacks` (
-  `accId` int(11) NOT NULL,
-  `charId` int(11) NOT NULL,
-  `items` varchar(128) NOT NULL DEFAULT '-1, -1, -1, -1, -1, -1, -1, -1',
-  PRIMARY KEY (`accId`,`charId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `charId` INT UNSIGNED NOT NULL,
+  `items` JSON NOT NULL,
+  PRIMARY KEY (`accId`, `charId`),
+  KEY `idx_charid` (`charId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `boards`
+-- Table structure for `boards`
 --
 
 CREATE TABLE IF NOT EXISTS `boards` (
-  `guildId` int(11) NOT NULL,
-  `text` varchar(1024) NOT NULL,
+  `guildId` INT UNSIGNED NOT NULL,
+  `text` VARCHAR(1024) NOT NULL,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`guildId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `characters`
+-- Table structure for `characters`
 --
 
 CREATE TABLE IF NOT EXISTS `characters` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `accId` int(11) NOT NULL,
-  `charId` int(11) NOT NULL,
-  `charType` int(11) NOT NULL DEFAULT '782',
-  `level` int(11) NOT NULL DEFAULT '1',
-  `exp` int(11) NOT NULL DEFAULT '0',
-  `fame` int(11) NOT NULL DEFAULT '0',
-  `items` varchar(128) NOT NULL DEFAULT '-1, -1, -1, -1',
-  `hpPotions` int(11) NOT NULL DEFAULT '0',
-  `mpPotions` int(11) NOT NULL DEFAULT '0',
-  `hp` int(11) NOT NULL DEFAULT '1',
-  `mp` int(11) NOT NULL DEFAULT '1',
-  `stats` varchar(128) NOT NULL DEFAULT '1, 1, 1, 1, 1, 1, 1, 1',
-  `dead` tinyint(1) NOT NULL DEFAULT '0',
-  `tex1` int(11) NOT NULL DEFAULT '0',
-  `tex2` int(11) NOT NULL DEFAULT '0',
-  `pet` int(11) NOT NULL DEFAULT '-1',
-  `petId` int(11) NOT NULL DEFAULT '-1',
-  `hasBackpack` int(11) NOT NULL DEFAULT '0',
-  `skin` int(11) NOT NULL DEFAULT '0',
-  `xpBoosterTime` int(11) NOT NULL DEFAULT '0',
-  `ldTimer` int(11) NOT NULL DEFAULT '0',
-  `ltTimer` int(11) NOT NULL DEFAULT '0',
-  `fameStats` varchar(512) NOT NULL,
-  `createTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `deathTime` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `totalFame` int(11) NOT NULL DEFAULT '0',
-  `lastSeen` datetime NOT NULL,
-  `lastLocation` varchar(128) NOT NULL,
-  PRIMARY KEY (`id`,`accId`,`dead`)
-) ENGINE=MyISAM  DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `charId` SMALLINT UNSIGNED NOT NULL,
+  `charType` SMALLINT UNSIGNED NOT NULL DEFAULT '782',
+  `level` TINYINT UNSIGNED NOT NULL DEFAULT '1',
+  `exp` INT UNSIGNED NOT NULL DEFAULT '0',
+  `fame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `items` JSON NOT NULL,
+  `hpPotions` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `mpPotions` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `hp` SMALLINT UNSIGNED NOT NULL DEFAULT '1',
+  `mp` SMALLINT UNSIGNED NOT NULL DEFAULT '1',
+  `stats` JSON NOT NULL,
+  `dead` BOOLEAN NOT NULL DEFAULT FALSE,
+  `tex1` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `tex2` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `pet` INT UNSIGNED NOT NULL DEFAULT '0',
+  `petId` INT UNSIGNED NOT NULL DEFAULT '0',
+  `hasBackpack` BOOLEAN NOT NULL DEFAULT FALSE,
+  `skin` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `xpBoosterTime` INT UNSIGNED NOT NULL DEFAULT '0',
+  `ldTimer` INT UNSIGNED NOT NULL DEFAULT '0',
+  `ltTimer` INT UNSIGNED NOT NULL DEFAULT '0',
+  `fameStats` JSON,
+  `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `deathTime` DATETIME NULL DEFAULT NULL,
+  `totalFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `lastSeen` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `lastLocation` VARCHAR(128) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  KEY `idx_accid` (`accId`),
+  KEY `idx_dead` (`dead`),
+  KEY `idx_accid_dead` (`accId`, `dead`),
+  KEY `idx_lastseen` (`lastSeen`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `classstats`
+-- Table structure for `classstats`
 --
 
 CREATE TABLE IF NOT EXISTS `classstats` (
-  `accId` int(11) NOT NULL,
-  `objType` int(11) NOT NULL,
-  `bestLv` int(11) NOT NULL DEFAULT '1',
-  `bestFame` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`accId`,`objType`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `objType` SMALLINT UNSIGNED NOT NULL,
+  `bestLv` TINYINT UNSIGNED NOT NULL DEFAULT '1',
+  `bestFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  PRIMARY KEY (`accId`, `objType`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `dailyquests`
+-- Table structure for `dailyquests`
 --
 
 CREATE TABLE IF NOT EXISTS `dailyquests` (
-  `accId` int(11) NOT NULL,
-  `goals` varchar(512) NOT NULL,
-  `tier` int(11) NOT NULL DEFAULT '1',
-  `time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `goals` JSON NOT NULL,
+  `tier` TINYINT UNSIGNED NOT NULL DEFAULT '1',
+  `time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`accId`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `death`
+-- Table structure for `death`
 --
 
 CREATE TABLE IF NOT EXISTS `death` (
-  `accId` int(11) NOT NULL,
-  `chrId` int(11) NOT NULL,
-  `name` varchar(64) NOT NULL DEFAULT 'DEFAULT',
-  `charType` int(11) NOT NULL DEFAULT '782',
-  `tex1` int(11) NOT NULL DEFAULT '0',
-  `tex2` int(11) NOT NULL DEFAULT '0',
-  `skin` int(11) NOT NULL DEFAULT '0',
-  `items` varchar(128) NOT NULL DEFAULT '-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1',
-  `fame` int(11) NOT NULL DEFAULT '0',
-  `exp` int(11) NOT NULL,
-  `fameStats` varchar(256) NOT NULL,
-  `totalFame` int(11) NOT NULL DEFAULT '0',
-  `firstBorn` tinyint(1) NOT NULL,
-  `killer` varchar(128) NOT NULL,
-  `time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`accId`,`chrId`,`time`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `chrId` INT UNSIGNED NOT NULL,
+  `name` VARCHAR(64) NOT NULL DEFAULT 'DEFAULT',
+  `charType` SMALLINT UNSIGNED NOT NULL DEFAULT '782',
+  `tex1` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `tex2` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `skin` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `items` JSON NOT NULL,
+  `fame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `exp` INT UNSIGNED NOT NULL DEFAULT '0',
+  `fameStats` JSON,
+  `totalFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `firstBorn` BOOLEAN NOT NULL DEFAULT FALSE,
+  `killer` VARCHAR(128) NOT NULL,
+  `time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_accid` (`accId`),
+  KEY `idx_time` (`time`),
+  KEY `idx_accid_time` (`accId`, `time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `giftcodes`
+-- Table structure for `giftcodes`
 --
 
 CREATE TABLE IF NOT EXISTS `giftcodes` (
-  `code` varchar(128) NOT NULL,
-  `content` varchar(512) NOT NULL,
-  `accId` int(11) NOT NULL DEFAULT '0',
-  PRIMARY KEY (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  `code` VARCHAR(128) NOT NULL,
+  `content` JSON NOT NULL,
+  `accId` BIGINT UNSIGNED NOT NULL DEFAULT '0',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `redeemed_at` DATETIME NULL DEFAULT NULL,
+  PRIMARY KEY (`code`),
+  KEY `idx_accid` (`accId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `globalnews`
+-- Table structure for `globalnews`
 --
 
 CREATE TABLE IF NOT EXISTS `globalnews` (
-  `slot` int(11) NOT NULL,
-  `linkType` int(11) NOT NULL,
-  `title` varchar(65) NOT NULL,
-  `image` text NOT NULL,
-  `priority` int(11) NOT NULL,
-  `linkDetail` text NOT NULL,
-  `platform` varchar(128) NOT NULL DEFAULT 'kabam.com,kongregate,steam,rotmg',
-  `startTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `endTime` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  PRIMARY KEY (`slot`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  `slot` SMALLINT UNSIGNED NOT NULL,
+  `linkType` TINYINT UNSIGNED NOT NULL,
+  `title` VARCHAR(128) NOT NULL,
+  `image` TEXT NOT NULL,
+  `priority` TINYINT UNSIGNED NOT NULL DEFAULT '0',
+  `linkDetail` TEXT NOT NULL,
+  `platform` VARCHAR(128) NOT NULL DEFAULT 'kabam.com,kongregate,steam,rotmg',
+  `startTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `endTime` DATETIME NOT NULL,
+  PRIMARY KEY (`slot`),
+  KEY `idx_time_range` (`startTime`, `endTime`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `guilds`
+-- Table structure for `guilds`
 --
 
 CREATE TABLE IF NOT EXISTS `guilds` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(128) NOT NULL DEFAULT 'DEFAULT_GUILD',
-  `members` varchar(128) NOT NULL,
-  `guildFame` int(11) NOT NULL,
-  `totalGuildFame` int(11) NOT NULL,
-  `level` int(11) NOT NULL DEFAULT '1',
-  PRIMARY KEY (`id`,`members`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(128) NOT NULL DEFAULT 'DEFAULT_GUILD',
+  `members` TEXT NOT NULL,
+  `guildFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `totalGuildFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `level` TINYINT UNSIGNED NOT NULL DEFAULT '1',
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `name` (`name`),
+  KEY `idx_level` (`level`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `mysteryboxes`
+-- Table structure for `mysteryboxes`
 --
 
 CREATE TABLE IF NOT EXISTS `mysteryboxes` (
-  `id` int(11) NOT NULL,
-  `title` varchar(128) NOT NULL,
-  `weight` int(11) NOT NULL,
-  `description` varchar(128) NOT NULL,
-  `contents` text NOT NULL,
-  `priceAmount` int(11) NOT NULL,
-  `priceCurrency` int(11) NOT NULL,
-  `image` text NOT NULL,
-  `icon` text NOT NULL,
-  `salePrice` int(11) NOT NULL,
-  `saleCurrency` int(11) NOT NULL,
-  `saleEnd` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `startTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `boxEnd` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(128) NOT NULL,
+  `weight` SMALLINT UNSIGNED NOT NULL,
+  `description` VARCHAR(256) NOT NULL,
+  `contents` JSON NOT NULL,
+  `priceAmount` INT UNSIGNED NOT NULL,
+  `priceCurrency` TINYINT UNSIGNED NOT NULL,
+  `image` TEXT NOT NULL,
+  `icon` TEXT NOT NULL,
+  `salePrice` INT UNSIGNED NOT NULL DEFAULT '0',
+  `saleCurrency` TINYINT UNSIGNED NOT NULL DEFAULT '0',
+  `saleEnd` DATETIME NULL DEFAULT NULL,
+  `startTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `boxEnd` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_time_range` (`startTime`, `boxEnd`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `news`
+-- Table structure for `news`
 --
 
 CREATE TABLE IF NOT EXISTS `news` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `icon` varchar(16) NOT NULL DEFAULT 'info',
-  `title` varchar(128) NOT NULL DEFAULT 'Default news title',
-  `text` varchar(128) NOT NULL DEFAULT 'Default news text',
-  `link` varchar(256) NOT NULL DEFAULT 'http://mmoe.net/',
-  `date` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`,`text`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `icon` VARCHAR(16) NOT NULL DEFAULT 'info',
+  `title` VARCHAR(128) NOT NULL DEFAULT 'Default news title',
+  `text` TEXT NOT NULL,
+  `link` VARCHAR(512) NOT NULL DEFAULT 'http://mmoe.net/',
+  `date` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `packages`
+-- Table structure for `packages`
 --
 
 CREATE TABLE IF NOT EXISTS `packages` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(128) NOT NULL,
-  `maxPurchase` int(11) NOT NULL DEFAULT '-1',
-  `weight` int(11) NOT NULL DEFAULT '0',
-  `contents` text NOT NULL,
-  `bgUrl` varchar(512) NOT NULL,
-  `price` int(11) NOT NULL,
-  `quantity` int(11) NOT NULL DEFAULT '-1',
-  `endDate` datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(128) NOT NULL,
+  `maxPurchase` SMALLINT NOT NULL DEFAULT '-1',
+  `weight` SMALLINT UNSIGNED NOT NULL DEFAULT '0',
+  `contents` JSON NOT NULL,
+  `bgUrl` VARCHAR(512) NOT NULL,
+  `price` INT UNSIGNED NOT NULL,
+  `quantity` INT NOT NULL DEFAULT '-1',
+  `endDate` DATETIME NULL DEFAULT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_enddate` (`endDate`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `pets`
+-- Table structure for `pets`
 --
 
 CREATE TABLE IF NOT EXISTS `pets` (
-  `accId` int(11) NOT NULL,
-  `petId` int(11) NOT NULL AUTO_INCREMENT,
-  `objType` smallint(5) NOT NULL,
-  `skinName` varchar(128) NOT NULL,
-  `skin` int(11) NOT NULL,
-  `family` int(11) NOT NULL,
-  `rarity` int(11) NOT NULL,
-  `maxLevel` int(11) NOT NULL DEFAULT '30',
-  `abilities` varchar(128) NOT NULL,
-  `levels` varchar(128) NOT NULL,
-  `xp` varchar(128) NOT NULL DEFAULT '0, 0, 0',
-  PRIMARY KEY (`accId`,`petId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `petId` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `objType` SMALLINT UNSIGNED NOT NULL,
+  `skinName` VARCHAR(128) NOT NULL,
+  `skin` SMALLINT UNSIGNED NOT NULL,
+  `family` TINYINT UNSIGNED NOT NULL,
+  `rarity` TINYINT UNSIGNED NOT NULL,
+  `maxLevel` TINYINT UNSIGNED NOT NULL DEFAULT '30',
+  `abilities` JSON NOT NULL,
+  `levels` JSON NOT NULL,
+  `xp` JSON NOT NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`petId`),
+  KEY `idx_accid` (`accId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `stats`
+-- Table structure for `stats`
 --
 
 CREATE TABLE IF NOT EXISTS `stats` (
-  `accId` int(11) NOT NULL,
-  `fame` int(11) NOT NULL,
-  `totalFame` int(11) NOT NULL,
-  `credits` int(11) NOT NULL,
-  `totalCredits` int(11) NOT NULL,
-  `fortuneTokens` int(11) NOT NULL,
-  `totalFortuneTokens` int(11) NOT NULL,
-  PRIMARY KEY (`accId`,`fame`,`totalFame`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `fame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `totalFame` INT UNSIGNED NOT NULL DEFAULT '0',
+  `credits` INT UNSIGNED NOT NULL DEFAULT '0',
+  `totalCredits` INT UNSIGNED NOT NULL DEFAULT '0',
+  `fortuneTokens` INT UNSIGNED NOT NULL DEFAULT '0',
+  `totalFortuneTokens` INT UNSIGNED NOT NULL DEFAULT '0',
+  PRIMARY KEY (`accId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `thealchemist`
+-- Table structure for `thealchemist`
 --
 
 CREATE TABLE IF NOT EXISTS `thealchemist` (
-  `id` int(11) NOT NULL,
-  `title` varchar(512) NOT NULL,
-  `description` varchar(512) DEFAULT NULL,
-  `image` varchar(512) NOT NULL,
-  `icon` varchar(512) NOT NULL,
-  `contents` text NOT NULL,
-  `priceFirstInGold` int(11) NOT NULL DEFAULT '51',
-  `priceFirstInToken` int(11) NOT NULL DEFAULT '1',
-  `priceSecondInGold` int(11) NOT NULL DEFAULT '75',
-  `startTime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `endTime` datetime NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `title` VARCHAR(512) NOT NULL,
+  `description` TEXT,
+  `image` VARCHAR(512) NOT NULL,
+  `icon` VARCHAR(512) NOT NULL,
+  `contents` JSON NOT NULL,
+  `priceFirstInGold` SMALLINT UNSIGNED NOT NULL DEFAULT '51',
+  `priceFirstInToken` SMALLINT UNSIGNED NOT NULL DEFAULT '1',
+  `priceSecondInGold` SMALLINT UNSIGNED NOT NULL DEFAULT '75',
+  `startTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `endTime` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_time_range` (`startTime`, `endTime`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `unlockedclasses`
+-- Table structure for `unlockedclasses`
 --
 
 CREATE TABLE IF NOT EXISTS `unlockedclasses` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `accId` int(11) NOT NULL,
-  `class` varchar(128) NOT NULL,
-  `available` varchar(128) NOT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB  DEFAULT CHARSET=latin1 AUTO_INCREMENT=1 ;
+  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `class` VARCHAR(128) NOT NULL,
+  `available` JSON NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_accid` (`accId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
 --
--- Tabellenstruktur für Tabelle `vaults`
+-- Table structure for `vaults`
 --
 
 CREATE TABLE IF NOT EXISTS `vaults` (
-  `accId` int(11) NOT NULL,
-  `chestId` int(11) NOT NULL AUTO_INCREMENT,
-  `items` varchar(128) NOT NULL,
-  PRIMARY KEY (`accId`,`chestId`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;
-
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+  `chestId` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `accId` BIGINT UNSIGNED NOT NULL,
+  `items` JSON NOT NULL,
+  PRIMARY KEY (`chestId`),
+  KEY `idx_accid` (`accId`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

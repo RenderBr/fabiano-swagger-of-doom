@@ -1,5 +1,6 @@
 ﻿#region
 
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -17,7 +18,7 @@ namespace wServer.logic.behaviors
 
         public TransformOnDeath(string target, int min = 1, int max = 1, double probability = 1, bool returnToSpawn = false)
         {
-            this.target = BehaviorDb.InitGameData.IdToObjectType[target];
+            this.target = BehaviorDb.InitGameDataService.IdToObjectType[target];
             this.min = min;
             this.max = max;
             this.probability = (float) probability;

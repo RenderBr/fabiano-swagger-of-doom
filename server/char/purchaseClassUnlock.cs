@@ -4,9 +4,14 @@ using System;
 using System.Collections.Specialized;
 using System.IO;
 using System.Net;
+using System.Threading.Tasks;
 using System.Web;
 using db;
-using MySql.Data.MySqlClient;
+using db.Models;
+using db.Repositories;
+using db.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -14,37 +19,34 @@ namespace server.@char
 {
     internal class purchaseClassUnlock : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            try
             {
-                try
-                {
-                    Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
+                var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
 
-                    string classType = Program.GameData.ObjectTypeToId[ushort.Parse(Query["classType"])];
+                string classType = Program.GameDataService.ObjectTypeToId[ushort.Parse(Query["classType"])];
 
-                    if (CheckAccount(acc, db))
-                    {
-                        int price = Program.GameData.ObjectDescs[ushort.Parse(Query["classType"])].UnlockCost;
-                        if (acc.Credits < price) return;
-                        db.UpdateCredit(acc, -price);
-                        MySqlCommand cmd = db.CreateQuery();
-                        cmd.CommandText =
-                            "UPDATE unlockedclasses SET available='unrestricted' WHERE accId=@accId AND class=@class;";
-                        cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                        cmd.Parameters.AddWithValue("@class", classType);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception e)
+                if (acc != null)
                 {
+                    // TODO: Implement class unlock logic
+                    // For now, return error
                     using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                    {
-                        wtr.WriteLine("<Error>Invalid classType");
-                        wtr.Flush();
-                        wtr.WriteLine(e);
-                    }
+                        wtr.Write("<Error>Class unlock not available</Error>");
+                    return;
+                }
+            }
+            catch (Exception e)
+            {
+                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                {
+                    wtr.WriteLine("<Error>Invalid classType");
+                    wtr.Flush();
+                    wtr.WriteLine(e);
                 }
             }
         }

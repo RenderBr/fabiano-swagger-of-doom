@@ -16,7 +16,7 @@ namespace wServer.networking.handlers
             get { return PacketID.PLAYERTEXT; }
         }
 
-        protected override void HandlePacket(Client client, PlayerTextPacket packet)
+        protected override Task HandlePacket(Client client, PlayerTextPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -42,6 +42,7 @@ namespace wServer.networking.handlers
                         client.Player.SendInfo("{\"key\":\"server.invalid_chars\"}");
                 }
             });
+            return Task.CompletedTask;
         }
     }
 }

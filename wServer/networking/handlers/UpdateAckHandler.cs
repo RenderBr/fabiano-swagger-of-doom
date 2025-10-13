@@ -1,5 +1,6 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 
 #endregion
@@ -13,9 +14,10 @@ namespace wServer.networking.handlers
             get { return PacketID.UPDATEACK; }
         }
 
-        protected override void HandlePacket(Client client, UpdateAckPacket packet)
+        protected override Task HandlePacket(Client client, UpdateAckPacket packet)
         {
             client.Player.UpdatesReceived++;
+            return Task.CompletedTask;
         }
     }
 }

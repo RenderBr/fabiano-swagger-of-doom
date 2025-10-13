@@ -2,7 +2,9 @@
 
 using System;
 using System.Collections.Generic;
-using log4net;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using FailurePacket = wServer.networking.svrPackets.FailurePacket;
@@ -15,35 +17,42 @@ namespace wServer.networking
     internal interface IPacketHandler
     {
         PacketID ID { get; }
-        void Handle(Client client, ClientPacket packet);
+        Task Handle(Client client, ClientPacket packet);
     }
 
     internal abstract class PacketHandlerBase<T> : IPacketHandler where T : ClientPacket
     {
-        protected ILog log;
+        protected ILogger _logger;
         private Client client;
 
         public PacketHandlerBase()
         {
-            log = LogManager.GetLogger(GetType());
+            _logger = Program.Services?.GetService<ILoggerFactory>()?.CreateLogger(GetType());
         }
 
         public abstract PacketID ID { get; }
 
-        public void Handle(Client client, ClientPacket packet)
+        public Task Handle(Client client, ClientPacket packet)
         {
             this.client = client;
-            HandlePacket(client, (T) packet);
+            return HandlePacket(client, (T)packet);
         }
 
-        public RealmManager Manager { get { return client.Manager; } }
-        public Client Client { get { return client; } }
+        public RealmManager Manager
+        {
+            get { return client.Manager; }
+        }
 
-        protected abstract void HandlePacket(Client client, T packet);
+        public Client Client
+        {
+            get { return client; }
+        }
+
+        protected abstract Task HandlePacket(Client client, T packet);
 
         protected void SendFailure(string text)
         {
-            client.SendPacket(new FailurePacket {ErrorId = 0, ErrorDescription = text});
+            client.SendPacket(new FailurePacket { ErrorId = 0, ErrorDescription = text });
         }
     }
 
@@ -53,12 +62,12 @@ namespace wServer.networking
 
         static PacketHandlers()
         {
-            foreach (Type i in typeof (Packet).Assembly.GetTypes())
+            foreach (Type i in typeof(Packet).Assembly.GetTypes())
             {
-                if (typeof (IPacketHandler).IsAssignableFrom(i) &&
+                if (typeof(IPacketHandler).IsAssignableFrom(i) &&
                     !i.IsAbstract && !i.IsInterface)
                 {
-                    IPacketHandler pkt = (IPacketHandler) Activator.CreateInstance(i);
+                    IPacketHandler pkt = (IPacketHandler)Activator.CreateInstance(i);
                     Handlers.Add(pkt.ID, pkt);
                 }
             }

@@ -21,6 +21,7 @@
         {
             TickId = rdr.ReadInt32();
             Time = rdr.ReadInt32();
+            uint serverRealTimeMsOfLastNewTick = rdr.ReadUInt32();
             Position = Position.Read(psr, rdr);
             Records = new TimedPosition[rdr.ReadInt16()];
             for (int i = 0; i < Records.Length; i++)

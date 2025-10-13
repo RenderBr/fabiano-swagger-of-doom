@@ -1,5 +1,6 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 
 #endregion
@@ -13,9 +14,10 @@ namespace wServer.networking.handlers
             get { return PacketID.SHOOTACK; }
         }
 
-        protected override void HandlePacket(Client client, ShootAckPacket packet)
+        protected override Task HandlePacket(Client client, ShootAckPacket packet)
         {
             //TODO: Implement something
+            return Task.CompletedTask;
         }
     }
 }

@@ -91,7 +91,7 @@ namespace wServer.realm.setpieces
             foreach (IntPoint i in trees)
                 t[i.X, i.Y] = 3;
 
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
             for (int x = 0; x < Size; x++)
                 for (int y = 0; y < Size; y++)
                 {

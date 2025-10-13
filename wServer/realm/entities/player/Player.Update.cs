@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 
 #endregion
@@ -90,7 +92,7 @@ namespace wServer.realm.entities.player
 
                 if (tile.ObjId == 0 || tile.ObjType == 0 || !clientStatic.Add(new IntPoint(x, y))) continue;
                 var def = tile.ToDef(x, y);
-                var cls = Manager.GameData.ObjectDescs[tile.ObjType].Class;
+                var cls = Manager.GameDataService.ObjectDescs[tile.ObjType].Class;
                 if (cls == "ConnectedWall" || cls == "CaveWall")
                 {
                     if (def.Stats.Stats.Count(_ => _.Key == StatsType.ObjectConnection && _.Value != null) == 0)
@@ -200,7 +202,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log.LogError(e, "Error in SendNewTick");
             }
             if (Quest != null &&
                 (!lastUpdate.ContainsKey(Quest) || Quest.UpdateCount > lastUpdate[Quest]))
@@ -212,6 +214,8 @@ namespace wServer.realm.entities.player
             tickId++;
             p.TickId = tickId;
             p.TickTime = time.thisTickTimes;
+            p.ServerRealTimeMS = (uint)Environment.TickCount;
+            p.ServerLastRTTMS = (ushort)Client.Player.updateLastSeen;
             p.UpdateStatuses = sendEntities.Select(_ => _.ExportStats()).ToArray();
             Client.SendPacket(p);
         }

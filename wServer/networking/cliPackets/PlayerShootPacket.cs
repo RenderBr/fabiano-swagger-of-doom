@@ -7,6 +7,8 @@
         public short ContainerType { get; set; }
         public Position Position { get; set; }
         public float Angle { get; set; }
+        public short SpeedMulti { get; set; }
+        public short LifeMulti { get; set; }
 
         public override PacketID ID
         {
@@ -25,6 +27,8 @@
             ContainerType = rdr.ReadInt16();
             Position = Position.Read(psr, rdr);
             Angle = rdr.ReadSingle();
+            SpeedMulti = rdr.ReadInt16();
+            LifeMulti = rdr.ReadInt16();
         }
 
         protected override void Write(Client psr, NWriter wtr)

@@ -6,6 +6,7 @@
         public int OwnerId { get; set; }
         public short ContainerType { get; set; }
         public float Angle { get; set; }
+        public bool Bard { get; set; } = false;
 
         public override PacketID ID
         {
@@ -23,6 +24,7 @@
             OwnerId = rdr.ReadInt32();
             ContainerType = rdr.ReadInt16();
             Angle = rdr.ReadSingle();
+            Bard = rdr.ReadBoolean();
         }
 
         protected override void Write(Client psr, NWriter wtr)
@@ -31,6 +33,7 @@
             wtr.Write(OwnerId);
             wtr.Write(ContainerType);
             wtr.Write(Angle);
+            wtr.Write(Bard);
         }
     }
 }

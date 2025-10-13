@@ -2,14 +2,22 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using db;
-using MySql.Data.MySqlClient;
+using db.Models;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using MySqlConnector;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.worlds;
+// Alias to resolve ambiguity between db.Models.Vault and wServer.realm.worlds.Vault
+using GameVault = wServer.realm.worlds.Vault;
 
 #endregion
 
@@ -22,9 +30,10 @@ namespace wServer.networking.handlers
             get { return PacketID.INVSWAP; }
         }
 
-        protected override void HandlePacket(Client client, InvSwapPacket packet)
+        protected override Task HandlePacket(Client client, InvSwapPacket packet)
         {
-            if (client.Player.Owner == null) return;
+            var log = Program.Services.GetRequiredService<ILogger<InvSwapHandler>>();
+            if (client.Player.Owner == null) return Task.CompletedTask;
 
             if (client.Player.Owner is PetYard)
             {
@@ -101,7 +110,7 @@ namespace wServer.networking.handlers
                     return;
                 }
 
-                if (!IsValid(item1, item2, con1, con2, packet, client))
+                if (!IsValid(item1, item2, con1, con2, packet, client, log))
                 {
                     client.Disconnect();
                     return;
@@ -126,23 +135,18 @@ namespace wServer.networking.handlers
                         return;
                     }
 
-                    using (Database db = new Database())
+                    // Note: DatabaseAdapter is used for legacy compatibility but not needed here
+                    try
                     {
-                        try
-                        {
-                            Account acc = db.GetAccount(client.Account.AccountId, Manager.GameData);
-                            acc.Gifts.Remove(con1.Inventory[packet.SlotObject1.SlotId].ObjectType);
-
-                            MySqlCommand cmd = db.CreateQuery();
-                            cmd.CommandText = @"UPDATE accounts SET gifts=@gifts WHERE id=@accId;";
-                            cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                            cmd.Parameters.AddWithValue("@gifts", Utils.GetCommaSepString(acc.Gifts.ToArray()));
-                            cmd.ExecuteNonQuery();
-                        }
-                        catch (Exception ex)
-                        {
-                            log.Error(ex);
-                        }
+                        // Remove from gifts string if present
+                        var gifts = string.IsNullOrEmpty(client.Account.Gifts) ? new int[0] : Utils.FromCommaSepString32(client.Account.Gifts);
+                        var list = gifts.ToList();
+                        list.Remove(con1.Inventory[packet.SlotObject1.SlotId].ObjectType);
+                        client.Account.Gifts = string.Join(",", list);
+                    }
+                    catch (Exception ex)
+                    {
+                        log.LogError(ex, "Error removing gift from string.");
                     }
                     con1.Inventory[packet.SlotObject1.SlotId] = null;
                     con2.Inventory[packet.SlotObject2.SlotId] = item1;
@@ -199,16 +203,17 @@ namespace wServer.networking.handlers
                     (en2 as Player).Client.SendPacket(new InvResultPacket {Result = 0});
                 }
 
-                if (client.Player.Owner is Vault)
-                    if ((client.Player.Owner as Vault).PlayerOwnerName == client.Account.Name)
+                if (client.Player.Owner is GameVault)
+                    if ((client.Player.Owner as GameVault).PlayerOwnerName == client.Account.Name)
                         return;
 
                 client.Player.SaveToCharacter();
                 client.Save();
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
 
-        private bool IsValid(Item item1, Item item2, IContainer con1, IContainer con2, InvSwapPacket packet, Client client)
+        private bool IsValid(Item item1, Item item2, IContainer con1, IContainer con2, InvSwapPacket packet, Client client, ILogger log)
         {
             if (con2 is Container || con2 is OneWayContainer)
                 return true;
@@ -221,12 +226,12 @@ namespace wServer.networking.handlers
 
                 if (!ret)
                 {
-                    log.FatalFormat("Cheat engine detected for player {0},\nInvalid InvSwap. {1} instead of {2}",
-                            client.Player.Name, client.Manager.GameData.Items[packet.SlotObject1.ObjectType].ObjectId, item1.ObjectId);
+                    log.LogCritical("Cheat engine detected for player {PlayerName},\nInvalid InvSwap. {Type} instead of {Type2}",
+                            client.Player.Name, client.Manager.GameDataService.Items[packet.SlotObject1.ObjectType].ObjectId, item1.ObjectId);
                     foreach (Player player in client.Player.Owner.Players.Values)
                         if (player.Client.Account.Rank >= 2)
                             player.SendInfo(String.Format("Cheat engine detected for player {0},\nInvalid InvSwap. {1} instead of {2}",
-                                client.Player.Name, client.Manager.GameData.Items[packet.SlotObject1.ObjectType].ObjectId, item1.ObjectId));
+                                client.Player.Name, client.Manager.GameDataService.Items[packet.SlotObject1.ObjectType].ObjectId, item1.ObjectId));
                 }
             }
             if (con1 is Player && con2 is Player)
@@ -235,12 +240,12 @@ namespace wServer.networking.handlers
 
                 if (!ret)
                 {
-                    log.FatalFormat("Cheat engine detected for player {0},\nInvalid InvSwap. {1} instead of {2}",
-                            client.Player.Name, item1.ObjectId, client.Manager.GameData.Items[packet.SlotObject2.ObjectType].ObjectId);
+                    log.LogCritical("Cheat engine detected for player {PlayerName},\nInvalid InvSwap. {Type} instead of {Type2}",
+                            client.Player.Name, item1.ObjectId, client.Manager.GameDataService.Items[packet.SlotObject2.ObjectType].ObjectId);
                     foreach (Player player in client.Player.Owner.Players.Values)
                         if (player.Client.Account.Rank >= 2)
                             player.SendInfo(String.Format("Cheat engine detected for player {0},\nInvalid InvSwap. {1} instead of {2}",
-                                client.Player.Name, item1.ObjectId, client.Manager.GameData.Items[packet.SlotObject2.ObjectType].ObjectId));
+                                client.Player.Name, item1.ObjectId, client.Manager.GameDataService.Items[packet.SlotObject2.ObjectType].ObjectId));
                 }
             }
 

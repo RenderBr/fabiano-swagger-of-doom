@@ -1,7 +1,12 @@
 ﻿#region
 
-using db;
-using MySql.Data.MySqlClient;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using db.Models;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -19,78 +24,90 @@ namespace wServer.networking.handlers
             get { return PacketID.CREATE; }
         }
 
-        protected override void HandlePacket(Client client, CreatePacket packet)
+        protected override async Task HandlePacket(Client client, CreatePacket packet)
         {
-            using (Database dbx = new Database())
+            await using var scope = Program.Services.CreateAsyncScope();
+            var characterRepository = scope.ServiceProvider.GetRequiredService<ICharacterRepository>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            int nextCharId = 1;
+            if (!client.Account.IsGuestAccount)
             {
-                MySqlCommand cmd = dbx.CreateQuery();
-                int nextCharId = 1;
-                if (!client.Account.IsGuestAccount)
+                // Get next character ID (simple approach for now)
+                var existingChars = await characterRepository.GetByAccountIdAsync(long.Parse(client.Account.AccountId));
+                nextCharId = existingChars.Count > 0 ? existingChars.Max(c => c.CharacterId) + 1 : 1;
+
+                // Check max character slots
+                var account = await unitOfWork.Accounts.GetByIdAsync(long.Parse(client.Account.AccountId));
+                if (account == null)
                 {
-                    nextCharId = dbx.GetNextCharId(client.Account);
-
-                    cmd.CommandText = "SELECT maxCharSlot FROM accounts WHERE id=@accId;";
-                    cmd.Parameters.AddWithValue("@accId", client.Account.AccountId);
-                    int maxChar = (int) cmd.ExecuteScalar();
-
-                    cmd = dbx.CreateQuery();
-                    cmd.CommandText = "SELECT COUNT(id) FROM characters WHERE accId=@accId AND dead = FALSE;";
-                    cmd.Parameters.AddWithValue("@accId", client.Account.AccountId);
-                    int currChar = (int) (long) cmd.ExecuteScalar();
-
-                    if (currChar >= maxChar)
-                    {
-                        client.Disconnect();
-                        return;
-                    }
+                    client.Disconnect();
+                    return;
                 }
-                client.Character = Database.CreateCharacter(client.Manager.GameData, (ushort) packet.ClassType,
-                    nextCharId);
 
-                int[] stats = new[]
+                var liveChars =
+                    await characterRepository.GetLiveCharactersByAccountIdAsync(long.Parse(client.Account.AccountId));
+                if (liveChars.Count >= account.MaxCharSlot)
                 {
-                    client.Character.MaxHitPoints,
-                    client.Character.MaxMagicPoints,
-                    client.Character.Attack,
-                    client.Character.Defense,
-                    client.Character.Speed,
-                    client.Character.Dexterity,
-                    client.Character.HpRegen,
-                    client.Character.MpRegen
-                };
-
-                int skin = client.Account.OwnedSkins.Contains(packet.SkinType) ? packet.SkinType : 0;
-                client.Character.Skin = skin;
-                cmd = dbx.CreateQuery();
-                cmd.Parameters.AddWithValue("@accId", client.Account.AccountId);
-                cmd.Parameters.AddWithValue("@charId", nextCharId);
-                cmd.Parameters.AddWithValue("@charType", packet.ClassType);
-                cmd.Parameters.AddWithValue("@items", Utils.GetCommaSepString(client.Character.EquipSlots()));
-                cmd.Parameters.AddWithValue("@stats", Utils.GetCommaSepString(stats));
-                cmd.Parameters.AddWithValue("@fameStats", client.Character.FameStats.ToString());
-                cmd.Parameters.AddWithValue("@skin", skin);
-                cmd.CommandText =
-                    "INSERT INTO characters (accId, charId, charType, level, exp, fame, items, hp, mp, stats, dead, pet, fameStats, skin) VALUES (@accId, @charId, @charType, 1, 0, 0, @items, 100, 100, @stats, FALSE, -1, @fameStats, @skin);";
-
-                if (cmd.ExecuteNonQuery() > 0)
-                {
-                    World target = client.Manager.Worlds[client.TargetWorld];
-                    client.SendPacket(new Create_SuccessPacket
-                    {
-                        CharacterID = client.Character.CharacterId,
-                        ObjectID =
-                            client.Manager.Worlds[client.TargetWorld].EnterWorld(
-                                client.Player = new Player(client.Manager, client))
-                    });
-                    client.Stage = ProtocalStage.Ready;
+                    client.Disconnect();
+                    return;
                 }
-                else
+            }
+
+            // TODO: Implement character creation logic without Database.CreateCharacter
+            // client.Character = Database.CreateCharacter(client.Manager.GameData, (ushort)packet.ClassType, nextCharId);
+
+            var ownedSkins = string.IsNullOrEmpty(client.Account.OwnedSkins)
+                ? Array.Empty<int>()
+                : client.Account.OwnedSkins.Split(',').Select(s => int.TryParse(s.Trim(), out var v) ? v : -1)
+                    .ToArray();
+            int skin = ownedSkins.Contains(packet.SkinType) ? packet.SkinType : 0;
+
+            var newCharacter = new Character
+            {
+                AccountId = long.Parse(client.Account.AccountId),
+                CharacterId = nextCharId,
+                CharacterType = packet.ClassType,
+                Level = 1,
+                Experience = 0,
+                Fame = 0,
+                Items = [2711, 2606, 2652, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
+                Hp = 100,
+                Mp = 100,
+                Dead = false,
+                PetItemType = 0,
+                FameStats = "{}",
+                Skin = skin
+            };
+
+            try
+            {
+                await characterRepository.AddAsync(newCharacter);
+                await unitOfWork.SaveChangesAsync();
+
+                client.Character = Char.FromCharacter(newCharacter);
+                Program.Logger.LogInformation(
+                    "Created character {CharacterId} for account {AccountName}", client.Character.CharacterId, client.Account.Name);
+
+                var target = client.Manager.Worlds[client.TargetWorld];
+                var player = new Player(client.Manager, client);
+
+                client.Player = player;
+
+                client.SendPacket(new Create_SuccessPacket
                 {
-                    client.SendPacket(new FailurePacket
-                    {
-                        ErrorDescription = "Failed to Load character."
-                    });
-                }
+                    CharacterID = newCharacter.CharacterId,
+                    ObjectID = target.EnterWorld(player)
+                });
+                client.Stage = ProtocalStage.Ready;
+            }
+            catch (Exception ex)
+            {
+                Program.Logger.LogError(ex,"Error creating character for account: {AccountID}", client.Account.AccountId);
+                client.SendPacket(new FailurePacket
+                {
+                    ErrorDescription = "Failed to Load character."
+                });
             }
         }
     }

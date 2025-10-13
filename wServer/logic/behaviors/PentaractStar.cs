@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.networking;
 using wServer.networking.svrPackets;
 using wServer.realm;

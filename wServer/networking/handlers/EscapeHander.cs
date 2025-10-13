@@ -1,5 +1,6 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -15,9 +16,9 @@ namespace wServer.networking.handlers
             get { return PacketID.ESCAPE; }
         }
 
-        protected override void HandlePacket(Client client, EscapePacket packet)
+        protected override Task HandlePacket(Client client, EscapePacket packet)
         {
-            if (client.Player.Owner == null) return;
+            if (client.Player.Owner == null) return Task.CompletedTask;
             World world = client.Manager.GetWorld(client.Player.Owner.Id);
             if (world.Id == World.NEXUS_ID)
             {
@@ -28,16 +29,17 @@ namespace wServer.networking.handlers
                     Name = "",
                     Text = "server.already_nexus"
                 });
-                return;
+                return Task.CompletedTask;
             }
             client.Reconnect(new ReconnectPacket
             {
                 Host = "",
-                Port = Program.Settings.GetValue<int>("port"),
+                Port = Program.Config.Realm.ServerPort,
                 GameId = World.NEXUS_ID,
                 Name = "nexus.Nexus",
                 Key = Empty<byte>.Array,
             });
+            return Task.CompletedTask;
         }
     }
 }

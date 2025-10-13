@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using db.data;
+using db.Models;
 
 namespace db
 {
@@ -38,10 +39,9 @@ namespace db
                 this.giftCode = giftCode;
             }
 
-            public Account GetAccount(XmlData data)
+            public string GetAccountId()
             {
-                using (var db = new Database())
-                    return db.GetAccount(accId, data);
+                return accId;
             }
 
             public AccountGiftCodeData GetGiftCode(out string giftCode)

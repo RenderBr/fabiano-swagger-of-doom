@@ -4,6 +4,7 @@
     {
         public int CharacterId { get; set; }
         public bool IsFromArena { get; set; }
+        public bool IsChallenger { get; set; }
 
         public override PacketID ID
         {
@@ -19,12 +20,14 @@
         {
             CharacterId = rdr.ReadInt32();
             IsFromArena = rdr.ReadBoolean();
+            IsChallenger = rdr.ReadBoolean();
         }
 
         protected override void Write(Client psr, NWriter wtr)
         {
             wtr.Write(CharacterId);
             wtr.Write(IsFromArena);
+            wtr.Write(IsChallenger);
         }
     }
 }

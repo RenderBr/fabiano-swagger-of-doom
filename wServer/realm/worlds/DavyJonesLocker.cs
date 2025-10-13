@@ -19,9 +19,9 @@ namespace wServer.realm.worlds
             AllowTeleport = true;
         }
 
-        protected override void Init()
+        protected override async Task InitAsync()
         {
-            LoadMap("wServer.realm.worlds.maps.vault.wmap", MapType.Wmap);
+            await LoadMapAsync("wServer.realm.worlds.maps.vault.wmap", MapType.Wmap);
         }
 
         public override int EnterWorld(Entity entity)

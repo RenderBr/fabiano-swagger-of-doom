@@ -3,7 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using log4net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using RageRealm.Shared.Models;
 using wServer.logic;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -17,7 +19,7 @@ namespace wServer.realm
     public class Entity : IProjectileOwner, ICollidable<Entity>, IDisposable
     {
         private const int EFFECT_COUNT = 47;
-        protected static readonly ILog Log = LogManager.GetLogger(typeof(Entity));
+        protected readonly ILogger<Entity> _logger;
         private readonly ObjectDesc desc;
         private readonly int[] effects;
         private Position[] posHistory;
@@ -45,6 +47,7 @@ namespace wServer.realm
 
         protected Entity(RealmManager manager, ushort objType, bool interactive, bool isPet)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<Entity>>();
             Manager = manager;
             ObjectType = objType;
             Name = "";
@@ -52,8 +55,8 @@ namespace wServer.realm
             BagDropped = false;
             IsPet = isPet;
             Manager.Behaviors.ResolveBehavior(this);
-            Manager.GameData.ObjectDescs.TryGetValue(objType, out desc);
-            Size = desc != null ? manager.GameData.ObjectDescs[objType].MaxSize : 100;
+            Manager.GameDataService.ObjectDescs.TryGetValue(objType, out desc);
+            Size = desc != null ? manager.GameDataService.ObjectDescs[objType].MaxSize : 100;
 
             if (interactive)
             {
@@ -328,12 +331,12 @@ namespace wServer.realm
         public static Entity Resolve(RealmManager manager, string name)
         {
             ushort id;
-            return !manager.GameData.IdToObjectType.TryGetValue(name, out id) ? null : Resolve(manager, id);
+            return !manager.GameDataService.IdToObjectType.TryGetValue(name, out id) ? null : Resolve(manager, id);
         }
 
         public static Entity Resolve(RealmManager manager, ushort id)
         {
-            var node = manager.GameData.ObjectTypeToElement[id];
+            var node = manager.GameDataService.ObjectTypeToElement[id];
             var cls = node.Element("Class");
             if (cls == null) throw new ArgumentException("Invalid XML Element, field class is missing");
             var type = cls.Value;
@@ -389,7 +392,7 @@ namespace wServer.realm
                 case "Pet":
                     throw new Exception("Pets should not instantiated using Entity.Resolve");
                 default:
-                    Log.Warn("Not supported type: " + type);
+                    Program.Services?.GetRequiredService<ILogger<Entity>>()?.LogWarning("Not supported type: {Type}", type);
                     return new Entity(manager, id);
             }
         }

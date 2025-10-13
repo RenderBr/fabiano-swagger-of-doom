@@ -1,46 +1,42 @@
-﻿using db;
-using db.JsonObjects;
+﻿using db.JsonObjects;
 using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.IO;
 using System.Linq;
-using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using System.Web;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace server.account
 {
 	internal class checkGiftCode : RequestHandler
 	{
-		protected override void HandleRequest()
+		protected override async Task HandleRequest()
 		{
-			using (Database db = new Database())
+			var scope = Program.Services.CreateScope();
+			var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+			string jsonCode = String.Empty;
+			string status = "Invalid code.";
+			var giftCode = await unitOfWork.GiftCodes.GetByCodeAsync(Query["code"]);
+			if (giftCode != null)
 			{
-				string jsonCode = String.Empty;
-				string status = "Invalid code.";
-				var cmd = db.CreateQuery();
-				cmd.CommandText = "SELECT * FROM giftCodes WHERE code=@code";
-				cmd.Parameters.AddWithValue("@code", Query["code"]);
+				jsonCode = giftCode.Content;
+			}
 
-				using (var rdr = cmd.ExecuteReader())
-					while (rdr.Read())
-						jsonCode = rdr.GetString("content");
+			var list = ParseContents(jsonCode);
+			if (list.Count > 0)
+			{
+				status = String.Empty;
+				foreach (var i in list)
+					status += (i + "</br>");
+			}
 
-                var list = ParseContents(jsonCode);
-				if(list.Count > 0)
-				{
-					status = String.Empty;
-					foreach (var i in list)
-						 status += (i + "</br>");
-				}
-
-				byte[] res = new byte[0];
-				if (status.IsNullOrWhiteSpace() || status == "Invalid code.")
-				{
-					res = Encoding.UTF8.GetBytes(
- $@"<html>
+			byte[] res = new byte[0];
+			if (status.IsNullOrWhiteSpace() || status == "Invalid code.")
+			{
+				res = Encoding.UTF8.GetBytes(
+$@"<html>
 	<head>
 		<title>Check Giftcode</title>
 	</head>
@@ -50,11 +46,11 @@ namespace server.account
 		</h1>
 	</body>
 </html>");
-				}
-				else
-				{
-					res = Encoding.UTF8.GetBytes(
- $@"<html>
+			}
+			else
+			{
+				res = Encoding.UTF8.GetBytes(
+$@"<html>
 	<head>
 		<title>Check Giftcode</title>
 	</head>
@@ -67,10 +63,9 @@ namespace server.account
 		</h3>
 	</body>
 </html>");
-				}
-				
-				Context.Response.OutputStream.Write(res, 0, res.Length);
 			}
+
+			Context.Response.OutputStream.Write(res, 0, res.Length);
 		}
 
 		private List<string> ParseContents(string json)
@@ -92,7 +87,7 @@ namespace server.account
             foreach(var item in code.Gifts)
                 if (!added.Contains(item))
                 {
-                    ret.Add($"{code.Gifts.Count(_ => _ == item)} {Program.GameData.Items[(ushort)item].ObjectId}");
+                    ret.Add($"{code.Gifts.Count(_ => _ == item)} {Program.GameDataService.Items[(ushort)item].ObjectId}");
                     added.Add(item);
                 }
             return ret;

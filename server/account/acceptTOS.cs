@@ -1,41 +1,34 @@
-﻿using db;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.IO;
-using System.Linq;
-using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using System.Web;
+﻿using System.Threading.Tasks;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace server.account
 {
     internal class acceptTOS : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+            var account = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            if (account == null)
             {
-                Account acc;
-                if (CheckAccount(acc = db.Verify(Query["guid"], Query["password"], Program.GameData), db))
-                {
-                    if (acc.NotAcceptedNewTos == null)
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.Write("<Error>TOS Already Accepted</Error>");
-                    else
-                    {
-                        var cmd = db.CreateQuery();
-                        cmd.CommandText = "Update accounts SET acceptedNewTos=1 WHERE uuid=@uuid;";
-                        cmd.Parameters.AddWithValue("@uuid", Query["guid"]);
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.Write(cmd.ExecuteNonQuery() > 0 ? "<Success/>" : "<Error>Internal Server Error</Error>");
-                    }
-                }
-                else
-                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                        wtr.Write("<Error>Account not found</Error>");
+                WriteErrorLine("Account not found");
+                return;
             }
+
+            if (account.AcceptedNewTos)
+            {
+                WriteErrorLine("TOS Already Accepted");
+                return;
+            }
+
+            account.AcceptedNewTos = true;
+            await accountRepository.SaveChangesAsync();
+            WriteLine("<Success/>");
         }
     }
 }

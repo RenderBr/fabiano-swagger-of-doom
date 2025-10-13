@@ -4,7 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using db.data;
-using log4net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -251,17 +252,17 @@ namespace wServer.realm.entities
         // rings
         public static int[] store9List = {0xb41, 0xbab, 0xbad, 0xbac};
 
-        private static readonly ILog log = LogManager.GetLogger(typeof (MerchantLists));
+        private static readonly ILogger<MerchantLists> _logger = Program.Services?.GetRequiredService<ILogger<MerchantLists>>();
 
-        public static void InitMerchatLists(XmlData data)
+        public static void InitMerchatLists(XmlDataService dataService)
         {
-            log.Info("Loading merchant lists...");
+            _logger?.LogInformation("Loading merchant lists...");
             List<int> accessoryDyeList = new List<int>();
             List<int> clothingDyeList = new List<int>();
             List<int> accessoryClothList = new List<int>();
             List<int> clothingClothList = new List<int>();
 
-            foreach (KeyValuePair<ushort, Item> item in data.Items.Where(_ => noShopCloths.All(i => i != _.Value.ObjectId)))
+            foreach (var item in dataService.Items.Where(_ => noShopCloths.All(i => i != _.Value.ObjectId)))
             {
                 if (item.Value.Texture1 != 0 && item.Value.ObjectId.Contains("Clothing") && item.Value.Class == "Dye")
                 {
@@ -294,7 +295,7 @@ namespace wServer.realm.entities
             ClothingClothList = clothingClothList.ToArray();
             AccessoryClothList = accessoryClothList.ToArray();
             AccessoryDyeList = accessoryDyeList.ToArray();
-            log.Info("Merchat lists added.");
+            _logger?.LogInformation("Merchant lists added.");
         }
 
         private static readonly string[] noShopCloths =

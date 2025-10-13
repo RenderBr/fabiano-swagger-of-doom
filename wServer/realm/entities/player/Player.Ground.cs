@@ -2,6 +2,8 @@
 
 using System;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 
 #endregion
 
@@ -45,7 +47,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception ex)
             {
-                log.Error(ex);
+                log.LogError(ex, "Error in Player Ground");
             }
         }
     }

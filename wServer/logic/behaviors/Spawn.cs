@@ -1,5 +1,6 @@
 ﻿#region
 
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -17,7 +18,7 @@ namespace wServer.logic.behaviors
 
         public Spawn(string children, int maxChildren = 5, double initialSpawn = 0.5, Cooldown coolDown = new Cooldown())
         {
-            this.children = BehaviorDb.InitGameData.IdToObjectType[children];
+            this.children = BehaviorDb.InitGameDataService.IdToObjectType[children];
             this.maxChildren = maxChildren;
             this.initialSpawn = (int) (maxChildren*initialSpawn);
             this.coolDown = coolDown.Normalize(0);

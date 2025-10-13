@@ -1,4 +1,6 @@
-﻿namespace wServer.networking.cliPackets
+﻿using Microsoft.Extensions.Logging;
+
+namespace wServer.networking.cliPackets
 {
     public class FailurePacket : ClientPacket
     {
@@ -23,6 +25,7 @@
 
         protected override void Write(Client psr, NWriter wtr)
         {
+            Program.Logger.LogWarning("Sending FailurePacket: {ErrorId} - {ErrorDescription}", ErrorId, ErrorDescription);
             wtr.Write(ErrorId);
             wtr.WriteUTF(ErrorDescription);
         }

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.networking.svrPackets;
@@ -15,9 +16,10 @@ namespace wServer.networking.handlers
     {
         public override PacketID ID { get { return PacketID.GUILDINVITE; } }
 
-        protected override void HandlePacket(Client client, GuildInvitePacket packet)
+        protected override Task HandlePacket(Client client, GuildInvitePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => Handle(client.Player, packet));
+            return Task.CompletedTask;
         }
 
         void Handle(Player player, GuildInvitePacket packet)

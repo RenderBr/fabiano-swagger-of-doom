@@ -4,8 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using db;
-using db.JsonObjects;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm.entities;
@@ -22,19 +23,26 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
-            var giftCode = player.Client.Account.NextGiftCode();
+            var giftCode = player.Client.Account.NextGiftCode; // property in Account model
             if (giftCode == null)
             {
                 player.SendError("No new giftcode found.");
-                return false;
+                return;
             }
 
             var data = AccountDataHelper.GenerateAccountGiftCodeData(player.AccountId, giftCode).Write();
             var qrGenerator = new QrCodeGenerator();
-            var qrCode = qrGenerator.CreateQrCode($"{Program.Settings.GetValue<string>("serverDomain")}/account/redeemGiftCode?data={data}", QrCodeGenerator.EccLevel.H);
-            var bmp = qrCode.GetGraphic(5);
+            var qrCode = qrGenerator.CreateQrCode($"{Program.Config.Realm.ServerDomain}/account/redeemGiftCode?data={data}", QrCodeGenerator.EccLevel.H);
+            var renderer = new QrCodeGenerator.QrCode.QrCodeRenderer
+            {
+                ModuleMatrix = qrCode.ModuleMatrix
+                    .Select(row => row.Cast<bool>().ToList())
+                    .ToList()
+            };
+
+            using var bmp = renderer.GetGraphic(8); // 8px per module = decent density
             var rgbValues = bmp.GetPixels();
 
             player.Client.SendPacket(new PicPacket
@@ -46,7 +54,6 @@ namespace wServer.realm.commands
                     Width = bmp.Width
                 }
             });
-            return true;
         }
     }
 
@@ -57,17 +64,16 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             player.Client.Reconnect(new ReconnectPacket
             {
                 Host = "",
-                Port = Program.Settings.GetValue<int>("port"),
+                Port = Program.Config.Realm.ServerPort,
                 GameId = World.TUT_ID,
                 Name = "Tutorial",
                 Key = Empty<byte>.Array,
             });
-            return true;
         }
     }
 
@@ -78,18 +84,17 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             if(String.IsNullOrWhiteSpace(args[0]))
             {
                 player.SendInfo("Usage: /trade <player name>");
-                return false;
+                return;
             }
             player.RequestTrade(time, new RequestTradePacket
             {
                 Name = args[0]
             });
-            return true;
         }
     }
 
@@ -101,7 +106,7 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             StringBuilder sb = new StringBuilder("Players online: ");
             Player[] copy = player.Owner.Players.Values.ToArray();
@@ -112,7 +117,6 @@ namespace wServer.realm.commands
             }
 
             player.SendInfo(sb.ToString());
-            return true;
         }
     }
 
@@ -123,10 +127,9 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             player.SendInfo(player.Owner.Name);
-            return true;
         }
     }
 
@@ -137,7 +140,7 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             if (player.HasConditionEffect(ConditionEffectIndex.Paused))
             {
@@ -155,7 +158,7 @@ namespace wServer.realm.commands
                     if (i.ObjectDesc.Enemy)
                     {
                         player.SendInfo("Not safe to pause.");
-                        return false;
+                        return;
                     }
                 }
                 player.ApplyConditionEffect(new ConditionEffect
@@ -165,7 +168,6 @@ namespace wServer.realm.commands
                 });
                 player.SendInfo("Game paused.");
             }
-            return true;
         }
     }
 
@@ -176,14 +178,14 @@ namespace wServer.realm.commands
         {
         }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             try
             {
                 if (String.Equals(player.Name.ToLower(), args[0].ToLower()))
                 {
                     player.SendInfo("You are already at yourself, and always will be!");
-                    return false;
+                    return;
                 }
 
                 foreach (KeyValuePair<int, Player> i in player.Owner.Players)
@@ -194,7 +196,7 @@ namespace wServer.realm.commands
                         {
                             ObjectId = i.Value.Id
                         });
-                        return true;
+                        return;
                     }
                 }
                 player.SendInfo(string.Format("Cannot teleport, {0} not found!", args[0].Trim()));
@@ -203,7 +205,6 @@ namespace wServer.realm.commands
             {
                 player.SendHelp("Usage: /teleport <player name>");
             }
-            return false;
         }
     }
 
@@ -211,17 +212,17 @@ namespace wServer.realm.commands
     {
         public TellCommand() : base("tell") { }
 
-        protected override bool Process(Player player, RealmTime time, string[] args)
+        protected override async Task Process(Player player, RealmTime time, string[] args)
         {
             if (!player.NameChosen)
             {
                 player.SendError("Choose a name!");
-                return false;
+                return;
             }
             if (args.Length < 2)
             {
                 player.SendError("Usage: /tell <player name> <text>");
-                return false;
+                return;
             }
 
             string playername = args[0].Trim();
@@ -230,7 +231,7 @@ namespace wServer.realm.commands
             if (String.Equals(player.Name.ToLower(), playername.ToLower()))
             {
                 player.SendInfo("Quit telling yourself!");
-                return false;
+                return;
             }
 
             if (playername.ToLower() == "muledump")
@@ -248,22 +249,24 @@ namespace wServer.realm.commands
                         CleanText = ""
                     });
 
-                    player.Manager.Database.DoActionAsync(db =>
+                    // TODO: Migrate muledump functionality to repository pattern
+                    // player.Manager.Database.DoActionAsync(db =>
+                    // {
+                    //     var cmd = db.CreateQuery();
+                    //     cmd.CommandText = "UPDATE accounts SET publicMuledump=0 WHERE id=@accId;";
+                    //     cmd.Parameters.AddWithValue("@accId", player.AccountId);
+                    //     cmd.ExecuteNonQuery();
+                    // });
+
+                    player.Client.SendPacket(new TextPacket()
                     {
-                        var cmd = db.CreateQuery();
-                        cmd.CommandText = "UPDATE accounts SET publicMuledump=0 WHERE id=@accId;";
-                        cmd.Parameters.AddWithValue("@accId", player.AccountId);
-                        cmd.ExecuteNonQuery();
-                        player.Client.SendPacket(new TextPacket()
-                        {
-                            ObjectId = -1,
-                            BubbleTime = 10,
-                            Stars = 70,
-                            Name = "Muledump",
-                            Recipient = player.Name,
-                            Text = "Your muledump is now hidden, only you can view it now.",
-                            CleanText = ""
-                        });
+                        ObjectId = -1,
+                        BubbleTime = 10,
+                        Stars = 70,
+                        Name = "Muledump",
+                        Recipient = player.Name,
+                        Text = "Your muledump is now hidden, only you can view it now.",
+                        CleanText = ""
                     });
                 }
                 else if (msg.ToLower() == "public muledump")
@@ -278,23 +281,25 @@ namespace wServer.realm.commands
                         Text = msg.ToSafeText(),
                         CleanText = ""
                     });
-                    player.Manager.Database.DoActionAsync(db =>
+                    
+                    // TODO: Migrate muledump functionality to repository pattern
+                    // player.Manager.Database.DoActionAsync(db =>
+                    // {
+                    //     var cmd = db.CreateQuery();
+                    //     cmd.CommandText = "UPDATE accounts SET publicMuledump=1 WHERE id=@accId;";
+                    //     cmd.Parameters.AddWithValue("@accId", player.AccountId);
+                    //     cmd.ExecuteNonQuery();
+                    // });
+                    
+                    player.Client.SendPacket(new TextPacket()
                     {
-                        var cmd = db.CreateQuery();
-                        cmd.CommandText = "UPDATE accounts SET publicMuledump=1 WHERE id=@accId;";
-                        cmd.Parameters.AddWithValue("@accId", player.AccountId);
-                        cmd.ExecuteNonQuery();
-
-                        player.Client.SendPacket(new TextPacket()
-                        {
-                            ObjectId = -1,
-                            BubbleTime = 10,
-                            Stars = 70,
-                            Name = "Muledump",
-                            Recipient = player.Name,
-                            Text = "Your muledump is now public, anyone can view it now.",
-                            CleanText = ""
-                        });
+                        ObjectId = -1,
+                        BubbleTime = 10,
+                        Stars = 70,
+                        Name = "Muledump",
+                        Recipient = player.Name,
+                        Text = "Your muledump is now public, anyone can view it now.",
+                        CleanText = ""
                     });
                 }
                 else
@@ -321,7 +326,7 @@ namespace wServer.realm.commands
                         CleanText = ""
                     });
                 }
-                return true;
+                return;
             }
 
             foreach (var i in player.Manager.Clients.Values)
@@ -349,11 +354,10 @@ namespace wServer.realm.commands
                         Text = msg.ToSafeText(),
                         CleanText = ""
                     });
-                    return true;
+                    return;
                 }
             }
             player.SendError(string.Format("{0} not found.", playername));
-            return false;
         }
     }
 }

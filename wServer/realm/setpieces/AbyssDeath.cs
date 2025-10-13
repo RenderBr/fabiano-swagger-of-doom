@@ -30,7 +30,7 @@ namespace wServer.realm.setpieces
 
         public void RenderSetPiece(World world, IntPoint pos)
         {
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
 
             IntPoint p = new IntPoint
             {

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
 using wServer.networking.svrPackets;
 using wServer.realm.worlds;
@@ -172,7 +173,7 @@ namespace wServer.realm
             player.UpdateCount++;
         }
 
-        private GuildManager GetDefaultGuild()
+        public static GuildManager GetDefaultGuild()
         {
             if (!CurrentManagers.ContainsKey(""))
                 CurrentManagers.Add("", new GuildManager(new Guild { Name = "", Rank = 0, Fame = 0, Id = 0 }, null));

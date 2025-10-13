@@ -2,12 +2,15 @@
 
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using log4net;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
-using System.Collections.Generic;
 
 #endregion
 
@@ -15,155 +18,197 @@ namespace wServer.realm
 {
     public class LogicTicker
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof (LogicTicker));
+        private readonly ILogger<LogicTicker> _logger;
         public static RealmTime CurrentTime;
-        private readonly ConcurrentQueue<Action<RealmTime>>[] pendings;
 
-        public int MsPT;
-        public int TPS;
+        private readonly ConcurrentQueue<Action<RealmTime>>[] _pendings;
+        private readonly ConcurrentQueue<Func<RealmTime, Task>>[] _asyncPendings;
+        private readonly RealmManager _manager;
+
+        public int MsPT { get; }
+        public int TPS { get; }
 
         public LogicTicker(RealmManager manager)
         {
-            Manager = manager;
-            pendings = new ConcurrentQueue<Action<RealmTime>>[5];
-            for (int i = 0; i < 5; i++)
-                pendings[i] = new ConcurrentQueue<Action<RealmTime>>();
-
+            _logger = Program.Services?.GetRequiredService<ILogger<LogicTicker>>();
+            _manager = manager;
             TPS = manager.TPS;
-            MsPT = 1000/TPS;
+            MsPT = 1000 / TPS;
+
+            _pendings = new ConcurrentQueue<Action<RealmTime>>[Enum.GetValues(typeof(PendingPriority)).Length];
+            _asyncPendings = new ConcurrentQueue<Func<RealmTime, Task>>[Enum.GetValues(typeof(PendingPriority)).Length];
+            for (int i = 0; i < _pendings.Length; i++)
+            {
+                _pendings[i] = new ConcurrentQueue<Action<RealmTime>>();
+                _asyncPendings[i] = new ConcurrentQueue<Func<RealmTime, Task>>();
+            }
         }
 
-        public RealmManager Manager { get; private set; }
-
-        public void AddPendingAction(Action<RealmTime> callback)
+        public void AddPendingAction(Action<RealmTime> callback, PendingPriority priority = PendingPriority.Normal)
         {
-            AddPendingAction(callback, PendingPriority.Normal);
+            _pendings[(int)priority].Enqueue(callback);
         }
 
-        public void AddPendingAction(Action<RealmTime> callback, PendingPriority priority)
+        public void AddPendingAsyncAction(Func<RealmTime, Task> callback, PendingPriority priority = PendingPriority.Normal)
         {
-            pendings[(int) priority].Enqueue(callback);
+            _asyncPendings[(int)priority].Enqueue(callback);
         }
 
-        public void TickLoop()
+        /// <summary>
+        /// Main game logic loop. Runs continuously until cancellation is requested.
+        /// </summary>
+        public async Task TickLoop(CancellationToken cancellationToken)
         {
-            log.Info("Logic loop started.");
-            Stopwatch watch = new Stopwatch();
+            _logger?.LogInformation("Logic loop started.");
+
+            var watch = Stopwatch.StartNew();
             long dt = 0;
             long count = 0;
-
-            watch.Start();
             RealmTime t = new RealmTime();
-            do
+
+            try
             {
-                if (Manager.Terminating) break;
-
-                long times = dt/MsPT;
-                dt -= times*MsPT;
-                times++;
-
-                long b = watch.ElapsedMilliseconds;
-
-                count += times;
-                if (times > 3)
-                    log.Warn("LAGGED!| time:" + times + " dt:" + dt + " count:" + count + " time:" + b + " tps:" +
-                             count/(b/1000.0));
-
-                t.tickTimes = b;
-                t.tickCount = count;
-                t.thisTickCounts = (int) times;
-                t.thisTickTimes = (int) (times*MsPT);
-
-                foreach (ConcurrentQueue<Action<RealmTime>> i in pendings)
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    Action<RealmTime> callback;
-                    while (i.TryDequeue(out callback))
+                    long times = dt / MsPT;
+                    dt -= times * MsPT;
+                    times++;
+
+                    long elapsed = watch.ElapsedMilliseconds;
+
+                    count += times;
+                    if (times > 3)
+                        _logger?.LogWarning("LAGGED! times={Times} dt={Dt} count={Count} elapsed={Elapsed} tps={Tps:F2}", times, dt, count, elapsed, count / (elapsed / 1000.0));
+
+                    t.tickTimes = elapsed;
+                    t.tickCount = count;
+                    t.thisTickCounts = (int)times;
+                    t.thisTickTimes = (int)(times * MsPT);
+
+                    // process pending sync actions
+                    foreach (var queue in _pendings)
+                    {
+                        while (queue.TryDequeue(out var callback))
+                        {
+                            try
+                            {
+                                callback(t);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogError(ex, "Error in pending action");
+                            }
+                        }
+                    }
+
+                    // process pending async actions
+                    var asyncTasks = new List<Task>();
+                    foreach (var queue in _asyncPendings)
+                    {
+                        while (queue.TryDequeue(out var callback))
+                        {
+                            try
+                            {
+                                var task = callback(t);
+                                asyncTasks.Add(task);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogError(ex, "Error starting async pending action");
+                            }
+                        }
+                    }
+
+                    // await all async actions to complete
+                    if (asyncTasks.Count > 0)
                     {
                         try
                         {
-                            callback(t);
+                            await Task.WhenAll(asyncTasks).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
-                            log.Error(ex);
+                            _logger?.LogError(ex, "Error in async pending actions");
                         }
                     }
+
+                    // tick worlds
+                    try
+                    {
+                        TickWorlds(t);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error ticking worlds");
+                    }
+
+                    // cleanup orphaned trade players
+                    try
+                    {
+                        var tradingPlayers = TradeManager.TradingPlayers
+                            .Where(p => p.Owner == null)
+                            .ToArray();
+
+                        foreach (var player in tradingPlayers)
+                            TradeManager.TradingPlayers.Remove(player);
+
+                        var requestPairs = TradeManager.CurrentRequests
+                            .Where(p => p.Key.Owner == null || p.Value.Owner == null)
+                            .ToArray();
+
+                        foreach (var pair in requestPairs)
+                            TradeManager.CurrentRequests.Remove(pair);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error cleaning trade managers");
+                    }
+
+                    // tick guild manager
+                    try
+                    {
+                        GuildManager.Tick(CurrentTime);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error ticking guild manager");
+                    }
+
+                    // wait until next tick
+                    await Task.Delay(MsPT, cancellationToken).ConfigureAwait(false);
+
+                    // measure drift
+                    dt += Math.Max(0, watch.ElapsedMilliseconds - elapsed - MsPT);
                 }
-                TickWorlds1(t);
+            }
+            catch (OperationCanceledException)
+            {
+                // expected on shutdown
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Logic loop crashed");
+            }
+            finally
+            {
+                _logger?.LogInformation("Logic loop stopped.");
+            }
+        }
 
-                Player[] tradingPlayers = TradeManager.TradingPlayers.Where(_ => _.Owner == null).ToArray();
-                foreach (var player in tradingPlayers)
-                    TradeManager.TradingPlayers.Remove(player);
-
-                KeyValuePair<Player, Player>[] requestPlayers = TradeManager.CurrentRequests.Where(_ => _.Key.Owner == null || _.Value.Owner == null).ToArray();
-                foreach (var players in requestPlayers)
-                    TradeManager.CurrentRequests.Remove(players);
-
-                //string[] accIds = Manager.Clients.Select(_ => _.Value.Account.AccountId).ToArray();
-
-                //List<string> curGStructAccIds = new List<string>();
-
-                //foreach(var i in GuildManager.CurrentManagers.Values)
-                //    curGStructAccIds.AddRange(i.GuildStructs.Select(_ => _.Key));
-
-                //foreach (var i in curGStructAccIds)
-                //    if (!accIds.Contains(i))
-                //        GuildManager.RemovePlayerWithId(i);
-
-                //var m = GuildManager.CurrentManagers;
-                //try
-                //{
-                //    foreach (var g in m)
-                //        if (g.Value.Count == 0)
-                //            GuildManager.CurrentManagers.Remove(g.Key);
-                //}
-                //catch (Exception ex)
-                //{
-                //    log.Error(ex);
-                //}
-
+        private void TickWorlds(RealmTime t)
+        {
+            CurrentTime = t;
+            foreach (var world in _manager.Worlds.Values.Distinct())
+            {
                 try
                 {
-                    GuildManager.Tick(CurrentTime);
+                    world.Tick(t);
                 }
                 catch (Exception ex)
                 {
-                    log.Error(ex);
+                    _logger?.LogError(ex, "Error ticking world {WorldName} (ID={WorldId})", world.Name, world.Id);
                 }
-
-                Thread.Sleep(MsPT);
-                dt += Math.Max(0, watch.ElapsedMilliseconds - b - MsPT);
-            } while (true);
-            log.Info("Logic loop stopped.");
+            }
         }
-
-        private void TickWorlds1(RealmTime t) //Continous simulation
-        {
-            CurrentTime = t;
-            foreach (World i in Manager.Worlds.Values.Distinct())
-                i.Tick(t);
-            //if (EnableMonitor)
-            //    svrMonitor.Mon.Tick(t);
-        }
-
-        //private void TickWorlds2(RealmTime t) //Discrete simulation
-        //{
-        //    long counter = t.thisTickTimes;
-        //    long c = t.tickCount - t.thisTickCounts;
-        //    long x = t.tickTimes - t.thisTickTimes;
-        //    while (counter >= MsPT)
-        //    {
-        //        c++;
-        //        x += MsPT;
-        //        TickWorlds1(new RealmTime
-        //        {
-        //            thisTickCounts = 1,
-        //            thisTickTimes = MsPT,
-        //            tickCount = c,
-        //            tickTimes = x
-        //        });
-        //        counter -= MsPT;
-        //    }
-        //}
     }
 }

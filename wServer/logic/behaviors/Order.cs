@@ -1,5 +1,6 @@
 ﻿#region
 
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion
@@ -18,7 +19,7 @@ namespace wServer.logic.behaviors
         public Order(double range, string children, string targetState)
         {
             this.range = range;
-            this.children = BehaviorDb.InitGameData.IdToObjectType[children];
+            this.children = BehaviorDb.InitGameDataService.IdToObjectType[children];
             targetStateName = targetState;
         }
 

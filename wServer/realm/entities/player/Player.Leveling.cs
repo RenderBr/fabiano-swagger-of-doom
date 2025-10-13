@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 
 #endregion
@@ -141,7 +143,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception ex)
             {
-                log.Error(ex);
+                log.LogError(ex, "Error in FindQuest");
             }
             return ret;
         }
@@ -195,12 +197,12 @@ namespace wServer.realm.entities.player
             {
                 Level++;
                 ExperienceGoal = GetExpGoal(Level);
-                foreach (var i in Manager.GameData.ObjectTypeToElement[ObjectType].Elements("LevelIncrease"))
+                foreach (var i in Manager.GameDataService.ObjectTypeToElement[ObjectType].Elements("LevelIncrease"))
                 {
                     var rand = new Random();
                     var min = int.Parse(i.Attribute("min").Value);
                     var max = int.Parse(i.Attribute("max").Value) + 1;
-                    var xElement = Manager.GameData.ObjectTypeToElement[ObjectType].Element(i.Value);
+                    var xElement = Manager.GameDataService.ObjectTypeToElement[ObjectType].Element(i.Value);
                     if (xElement == null) continue;
                     var limit =
                         int.Parse(
@@ -256,7 +258,7 @@ namespace wServer.realm.entities.player
                     }
                     catch (Exception ex)
                     {
-                        log.Error(ex);
+                        log.LogError(ex, "Error in EnemyKilled");
                     }
                 }
             }

@@ -70,7 +70,7 @@ namespace wServer.realm.setpieces
             t[26, 40] = t[27, 40] = t[27, 39] = t[27, 41] = 4;
             t[54, 40] = t[53, 40] = t[53, 39] = t[53, 41] = 4;
 
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
             for (int x = 0; x < Size; x++) //Rendering
                 for (int y = 0; y < Size; y++)
                     if (t[x, y] == 1)

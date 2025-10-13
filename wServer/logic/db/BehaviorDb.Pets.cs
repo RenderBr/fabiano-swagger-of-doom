@@ -15,7 +15,7 @@ namespace wServer.logic
         private static ctor LoadPetBehaviors()
         {
             ctor ret = Behav();
-            foreach (var item in InitGameData.TypeToPet)
+            foreach (var item in InitGameDataService.TypeToPet)
             {
                 ret.Init(item.Value.ObjectId,
                     new State(

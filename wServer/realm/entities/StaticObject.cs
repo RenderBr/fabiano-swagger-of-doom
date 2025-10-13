@@ -3,6 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Xml.Linq;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
 
@@ -13,7 +16,8 @@ namespace wServer.realm.entities
     public class StaticObject : Entity
     {
         //Stats
-        public StaticObject(RealmManager manager, ushort objType, int? lifeTime, bool stat, bool dying, bool hittestable)
+        public StaticObject(RealmManager manager, ushort objType, int? lifeTime, bool stat, bool dying,
+            bool hittestable)
             : base(manager, objType, IsInteractive(manager, objType))
         {
             if (Vulnerable = lifeTime.HasValue)
@@ -48,13 +52,15 @@ namespace wServer.realm.entities
         private static bool IsInteractive(RealmManager manager, ushort objType)
         {
             ObjectDesc desc;
-            if (manager.GameData.ObjectDescs.TryGetValue(objType, out desc))
+            if (manager.GameDataService.ObjectDescs.TryGetValue(objType, out desc))
             {
-                if(desc.Class != null)
+                if (desc.Class != null)
                     if (desc.Class == "Container" || desc.Class.ContainsIgnoreCase("wall") ||
-                        desc.Class == "Merchant" || desc.Class == "Portal") return false;
+                        desc.Class == "Merchant" || desc.Class == "Portal")
+                        return false;
                 return !(desc.Static && !desc.Enemy && !desc.EnemyOccupySquare);
             }
+
             return false;
         }
 
@@ -89,6 +95,7 @@ namespace wServer.realm.entities
                         effect.Effect == ConditionEffectIndex.Dazed && ObjectDesc.DazedImmune) continue;
                     ApplyConditionEffect(effect);
                 }
+
                 Owner.BroadcastPacket(new DamagePacket
                 {
                     TargetId = Id,
@@ -105,6 +112,7 @@ namespace wServer.realm.entities
                 UpdateCount++;
                 return true;
             }
+
             return false;
         }
 
@@ -116,16 +124,17 @@ namespace wServer.realm.entities
                 {
                     if (ObjectDesc != null &&
                         (ObjectDesc.EnemyOccupySquare || ObjectDesc.OccupySquare))
-                        if (Owner!= null)
-                            Owner.Obstacles[(int) (X - 0.5), (int) (Y - 0.5)] = 0;
+                        if (Owner != null)
+                            Owner.Obstacles[(int)(X - 0.5), (int)(Y - 0.5)] = 0;
                     Owner?.LeaveWorld(this);
                     return false;
                 }
             }
             catch (Exception ex)
             {
-                Log.ErrorFormat("Crash halted - HP check error:\n{0}", ex);
+                Program.Services.GetRequiredService<ILogger<StaticObject>>().LogError(ex, "Crash halted - HP check error");
             }
+
             return true;
         }
 
@@ -138,6 +147,7 @@ namespace wServer.realm.entities
                     HP -= time.thisTickTimes;
                     UpdateCount++;
                 }
+
                 CheckHP();
             }
 

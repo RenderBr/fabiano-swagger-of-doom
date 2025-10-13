@@ -4,7 +4,7 @@
     {
         public override void Crypt(Client client, byte[] dat, int offset, int len)
         {
-            client.ReceiveKey.Crypt(dat, offset, len);
+            //client.ReceiveKey.Crypt(dat, offset, len);
         }
     }
 }

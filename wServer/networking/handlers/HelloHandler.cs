@@ -3,7 +3,12 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using db;
+using db.Models;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -21,10 +26,14 @@ namespace wServer.networking.handlers
             get { return PacketID.HELLO; }
         }
 
-        protected override void HandlePacket(Client client, HelloPacket packet)
+        protected override async Task HandlePacket(Client client, HelloPacket packet)
         {
+            var log = Program.Services.GetRequiredService<ILogger<HelloHandler>>();
             if (Client.SERVER_VERSION != packet.BuildVersion)
             {
+                log.LogWarning(
+                    "HELLO mismatch check: client version '{PacketBuildVersion}', server version '{ServerVersion}'",
+                    packet.BuildVersion, Client.SERVER_VERSION);
                 client.SendPacket(new FailurePacket
                 {
                     ErrorId = 0,
@@ -38,139 +47,169 @@ namespace wServer.networking.handlers
                 client.Disconnect();
                 return;
             }
-            client.Manager.Database.DoActionAsync(db =>
+
+            Account account = null;
+            try
             {
-                if ((client.Account = db.Verify(packet.GUID, packet.Password, Manager.GameData)) == null)
-                {
-                    log.Info(@"Account not verified.");
-                    client.Account = Database.CreateGuestAccount(packet.GUID);
+                await using var scope = Program.Services.CreateAsyncScope();
+                var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+                account = await accountService.VerifyAsync(packet.GUID, packet.Password);
+            }
+            catch
+            {
+                // Verification failed
+            }
 
-                    if (client.Account == null)
-                    {
-                        log.Info(@"Account is null!");
-                        client.SendPacket(new FailurePacket
-                        {
-                            ErrorDescription = "Invalid account."
-                        });
-                        client.Disconnect();
-                        return;
-                    }
-                }
-                if (!client.Account.IsGuestAccount)
-                {
-                    int? timeout = null;
+            if (account == null)
+            {
+                log.LogInformation(@"Account not verified.");
+                // TODO: Create guest account using AccountService
+                client.Account = new Account { Guest = true, Uuid = packet.GUID, Name = "Guest" };
 
-                    if (DateTime.Now <= Program.WhiteListTurnOff)
-                    {
-                        if (!IsWhiteListed(client.Account.Rank))
-                        {
-                            client.SendPacket(new FailurePacket
-                            {
-                                ErrorId = 0,
-                                ErrorDescription = "You are not whitelisted!"
-                            });
-                            client.Disconnect();
-                            return;
-                        }
-                    }
-                    if (db.CheckAccountInUse(client.Account, ref timeout))
-                    {
-                        if (timeout == null)
-                        {
-                            client.SendPacket(new FailurePacket
-                            {
-                                ErrorId = 0,
-                                ErrorDescription = "Account in use."
-                            });
-                        }
-                        else
-                        {
-                            client.SendPacket(new FailurePacket
-                            {
-                                ErrorId = 0,
-                                ErrorDescription = "Account in use. (" + timeout + " seconds until timeout.)"
-                            });
-                        }
-                        client.Disconnect();
-                        return;
-                    }
-                }
-                log.Info(@"Client trying to connect!");
-                client.ConnectedBuild = packet.BuildVersion;
-                if (!client.Manager.TryConnect(client))
+                if (client.Account == null)
                 {
-                    client.Account = null;
+                    log.LogInformation(@"Account is null!");
                     client.SendPacket(new FailurePacket
                     {
-                        ErrorDescription = "Failed to connect."
+                        ErrorDescription = "Invalid account."
+                    });
+                    Program.Logger.LogInformation("Kicking {AccountName} because account is null.",
+                        client.Account.Name);
+                    client.Disconnect();
+                    return;
+                }
+            }
+            else
+            {
+                client.Account = account;
+            }
+
+            if (!client.Account.IsGuestAccount)
+            {
+                int? timeout = null;
+
+                if (DateTime.Now <= Program.WhiteListTurnOff)
+                {
+                    if (!IsWhiteListed(client.Account.Rank))
+                    {
+                        client.SendPacket(new FailurePacket
+                        {
+                            ErrorId = 0,
+                            ErrorDescription = "You are not whitelisted!"
+                        });
+                        Program.Logger.LogInformation("Kicking {AccountName} because they are not whitelisted.",
+                            client.Account.Name);
+                        client.Disconnect();
+                        return;
+                    }
+                }
+                // TODO: Check account in use via AccountService
+                //if (db.CheckAccountInUse(client.Account, ref timeout))
+                //{
+                //    if (timeout == null)
+                //    {
+                //        client.SendPacket(new FailurePacket
+                //        {
+                //            ErrorId = 0,
+                //            ErrorDescription = "Account in use."
+                //        });
+                //    }
+                //    else
+                //    {
+                //        client.SendPacket(new FailurePacket
+                //        {
+                //            ErrorId = 0,
+                //            ErrorDescription = "Account in use. (" + timeout + " seconds until timeout.)"
+                //        });
+                //    }
+                //    client.Disconnect();
+                //    return;
+                //}
+            }
+
+            log.LogInformation(@"Client trying to connect!");
+            client.ConnectedBuild = packet.BuildVersion;
+            if (!client.Manager.TryConnect(client))
+            {
+                client.Account = null;
+                client.SendPacket(new FailurePacket
+                {
+                    ErrorDescription = "Failed to connect."
+                });
+                client.Disconnect();
+                log.LogWarning(@"Failed to connect.");
+            }
+            else
+            {
+                log.LogInformation(@"Client loading world");
+                if (packet.GameId == World.NEXUS_LIMBO) packet.GameId = World.NEXUS_ID;
+                World world = client.Manager.GetWorld(packet.GameId);
+                if (world == null && packet.GameId == World.TUT_ID)
+                    world = client.Manager.AddWorld(new Tutorial(false));
+                if (world == null)
+                {
+                    client.SendPacket(new FailurePacket
+                    {
+                        ErrorId = 1,
+                        ErrorDescription = "Invalid world."
                     });
                     client.Disconnect();
-                    log.Warn(@"Failed to connect.");
+                    return;
                 }
-                else
+
+                if (world.NeedsPortalKey)
                 {
-                    log.Info(@"Client loading world");
-                    if (packet.GameId == World.NEXUS_LIMBO) packet.GameId = World.NEXUS_ID;
-                    World world = client.Manager.GetWorld(packet.GameId);
-                    if (world == null && packet.GameId == World.TUT_ID) world = client.Manager.AddWorld(new Tutorial(false));
-                    if (world == null)
+                    if (!world.PortalKey.SequenceEqual(packet.Key))
                     {
                         client.SendPacket(new FailurePacket
                         {
                             ErrorId = 1,
-                            ErrorDescription = "Invalid world."
+                            ErrorDescription = "Invalid Portal Key"
                         });
                         client.Disconnect();
                         return;
                     }
-                    if (world.NeedsPortalKey)
-                    {
-                        if (!world.PortalKey.SequenceEqual(packet.Key))
-                        {
-                            client.SendPacket(new FailurePacket
-                            {
-                                ErrorId = 1,
-                                ErrorDescription = "Invalid Portal Key"
-                            });
-                            client.Disconnect();
-                            return;
-                        }
-                        if (world.PortalKeyExpired)
-                        {
-                            client.SendPacket(new FailurePacket
-                            {
-                                ErrorId = 1,
-                                ErrorDescription = "Portal key expired."
-                            });
-                            client.Disconnect();
-                            return;
-                        }
-                    }
-                    log.Info(@"Client joined world " + world.Id);
-                    if (packet.MapInfo.Length > 0) //Test World
-                        (world as Test).LoadJson(Encoding.Default.GetString(packet.MapInfo));
 
-                    if (world.IsLimbo)
-                        world = world.GetInstance(client);
-                    client.Random = new wRandom(world.Seed);
-                    client.TargetWorld = world.Id;
-                    client.SendPacket(new MapInfoPacket
+                    if (world.PortalKeyExpired)
                     {
-                        Width = world.Map.Width,
-                        Height = world.Map.Height,
-                        Name = world.Name,
-                        Seed = world.Seed,
-                        ClientWorldName = world.ClientWorldName,
-                        Difficulty = world.Difficulty,
-                        Background = world.Background,
-                        AllowTeleport = world.AllowTeleport,
-                        ShowDisplays = world.ShowDisplays,
-                        ClientXML = world.ClientXml,
-                        ExtraXML = Manager.GameData.AdditionXml
-                    });
-                    client.Stage = ProtocalStage.Handshaked;
+                        client.SendPacket(new FailurePacket
+                        {
+                            ErrorId = 1,
+                            ErrorDescription = "Portal key expired."
+                        });
+                        client.Disconnect();
+                        return;
+                    }
                 }
-            });
+
+                log.LogInformation(@"Client joined world {WorldID}", world.Id);
+                if (packet.MapInfo.Length > 0) //Test World
+                    (world as Test).LoadJson(Encoding.Default.GetString(packet.MapInfo));
+
+                if (world.IsLimbo)
+                    world = world.GetInstance(client);
+                client.Random = new wRandom(world.Seed);
+                client.TargetWorld = world.Id;
+                client.SendPacket(new MapInfoPacket
+                {
+                    Width = world.Map.Width,
+                    Height = world.Map.Height,
+                    Name = world.Name,
+                    Seed = world.Seed,
+                    RealmName = world.ClientWorldName,
+                    DisplayName = world.Name,
+                    Difficulty = world.Difficulty,
+                    Background = world.Background,
+                    AllowTeleport = world.AllowTeleport,
+                    ShowDisplays = world.ShowDisplays,
+                    MaxPlayers = (short)world.MaxPlayers,
+                    ConnectionGuid = Guid.NewGuid().ToString(),
+                    GameOpenedTime = (uint)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds,
+                    ClientXML = world.ClientXml,
+                    ExtraXML = Manager.GameDataService.AdditionXml
+                });
+                client.Stage = ProtocalStage.Handshaked;
+            }
         }
 
         private bool IsWhiteListed(int rank)
@@ -180,6 +219,7 @@ namespace wServer.networking.handlers
                 if (rank > 0) return true;
                 return false;
             }
+
             return true;
         }
     }

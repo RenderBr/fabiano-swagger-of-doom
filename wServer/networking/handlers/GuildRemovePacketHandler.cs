@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.networking.svrPackets;
 using db;
+using db.Models;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 
@@ -15,9 +17,10 @@ namespace wServer.networking.handlers
     {
         public override PacketID ID { get { return PacketID.GUILDREMOVE; } }
 
-        protected override void HandlePacket(Client client, GuildRemovePacket packet)
+        protected override Task HandlePacket(Client client, GuildRemovePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => Handle(client, packet));
+            return Task.CompletedTask;
         }
 
         void Handle(Client client, GuildRemovePacket packet)
@@ -37,12 +40,12 @@ namespace wServer.networking.handlers
                     }
                     else
                     {
-                        Account acc = db.GetAccount(packet.Name, Manager.GameData);
-                        if (acc.NameChosen)
+                        Account acc = db.GetAccount(packet.Name, Manager.GameDataService).GetAwaiter().GetResult();
+                        if (acc != null && acc.NameChosen)
                         {
                             try
                             {
-                                if (acc.Guild.Name == client.Player.Guild.Name)
+                                if (acc.Guild != null && acc.Guild.Name == client.Player.Guild.Name)
                                 {
                                     if (client.Player.Guild[client.Account.AccountId].Rank <= acc.Guild.Rank && acc.Guild.Name != client.Player.Guild.Name)
                                         return;

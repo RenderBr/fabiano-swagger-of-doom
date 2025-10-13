@@ -1,28 +1,25 @@
-﻿using db;
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Web;
+﻿using System.Threading.Tasks;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace server.account
 {
     internal class validateEmail : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+            var account = await accountRepository.GetByAuthTokenAsync(Query["authToken"]);
+            if (account != null)
             {
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "UPDATE accounts SET verified=1 WHERE authToken=@authToken";
-                cmd.Parameters.AddWithValue("@authToken", Query["authToken"]);
-                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                {
-                    if (cmd.ExecuteNonQuery() == 1)
-                        Program.SendFile("game/verifySuccess.html", Context);
-                    else
-                        Program.SendFile("game/verifyFail.html", Context);
-                }
+                account.Verified = true;
+                await accountRepository.SaveChangesAsync();
+                await Program.SendFileAsync("game/verifySuccess.html", Context);
             }
+            else
+                await Program.SendFileAsync("game/verifyFail.html", Context);
         }
     }
 }

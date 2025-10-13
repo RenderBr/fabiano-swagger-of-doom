@@ -1,6 +1,8 @@
 ﻿#region
 
 using System;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -54,8 +56,8 @@ namespace wServer.logic.behaviors
                     Entity en = e.Host;
                     World w = e.Host.Manager.GetWorld(e.Host.Owner.Id);
                     entity.Move(en.X + xAdjustment, en.Y + yAdjustment);
-                    w.Timers.Add(new WorldTimer(dropDelay*1000, (world, t) => { w.EnterWorld(entity); }));
-                    w.Timers.Add(new WorldTimer(despawnTime*1000, (world, t) =>
+                    w.Timers.Add(new WorldTimer(dropDelay * 1000, (world, t) => { w.EnterWorld(entity); }));
+                    w.Timers.Add(new WorldTimer(despawnTime * 1000, (world, t) =>
                     {
                         try
                         {
@@ -63,7 +65,7 @@ namespace wServer.logic.behaviors
                         }
                         catch (Exception ex)
                         {
-                            log.ErrorFormat("Couldn't despawn portal.\n{0}", ex);
+                            log.LogError(ex, "Couldn't despawn portal.");
                         }
                     }));
                 }

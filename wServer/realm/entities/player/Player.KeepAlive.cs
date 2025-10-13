@@ -1,6 +1,8 @@
 ﻿#region
 
 using System;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 
 #endregion
@@ -38,7 +40,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log.LogError(e, "Error in Pong");
             }
         }
 

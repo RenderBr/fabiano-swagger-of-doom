@@ -1,6 +1,8 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using db;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.realm;
 
@@ -15,17 +17,19 @@ namespace wServer.networking.handlers
             get { return PacketID.CHECKCREDITS; }
         }
 
-        protected override void HandlePacket(Client client, CheckCreditsPacket packet)
+        protected override async Task HandlePacket(Client client, CheckCreditsPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
-                using (Database db = new Database())
+                client.Manager.Database.DoActionAsync( db =>
                 {
-                    db.ReadStats(client.Account);
+                    // Read stats equivalent would be done via repository
                     client.Player.Credits = client.Account.Credits;
                     client.Player.UpdateCount++;
-                }
+                });
             }, PendingPriority.Networking);
+            
+            await Task.CompletedTask;
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 namespace wServer.logic.transitions
@@ -22,7 +23,7 @@ namespace wServer.logic.transitions
         protected override bool TickCore(Entity host, RealmTime time, ref object state)
         {
             foreach (string children in childrens)
-                if (host.GetNearestEntity(dist, host.Manager.GameData.IdToObjectType[children]) != null) return false;
+                if (host.GetNearestEntity(dist, host.Manager.GameDataService.IdToObjectType[children]) != null) return false;
             return true;
         }
     }

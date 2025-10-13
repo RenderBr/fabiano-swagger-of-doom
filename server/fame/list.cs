@@ -1,10 +1,15 @@
 ﻿#region
 
 using db;
-using MySql.Data.MySqlClient;
+using db.Repositories;
+using db.Services;
 using System;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -12,7 +17,7 @@ namespace server.fame
 {
     internal class list : RequestHandler
     {
-        protected override void HandleRequest()
+        protected async override Task HandleRequest()
         {
             byte[] status = null;
 
@@ -46,55 +51,63 @@ namespace server.fame
                 root.Attributes.Append(spanAttr);
 
                 doc.AppendChild(root);
-
-                using (Database db = new Database())
+                
+                using (var scope = Program.Services.CreateScope())
                 {
-                    MySqlCommand cmd = db.CreateQuery();
-                    cmd.CommandText = @"SELECT * FROM death WHERE " + span + @" OR " + ac +
-                                      @" ORDER BY totalFame DESC LIMIT 20;";
+                    var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                    var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+                    // Use EF to query deaths
+                    var deathsQuery = unitOfWork.Context.Deaths.AsQueryable();
+                    if (Query["timespan"] == "week")
+                        deathsQuery = deathsQuery.Where(d => d.Time >= DateTime.Now.AddDays(-7));
+                    else if (Query["timespan"] == "month")
+                        deathsQuery = deathsQuery.Where(d => d.Time >= DateTime.Now.AddMonths(-1));
+                    // for "all", no filter
+
                     if (Query["accountId"] != null)
                     {
-                        cmd.Parameters.AddWithValue("@accId", Query["accountId"]);
-                        cmd.Parameters.AddWithValue("@charId", Query["charId"]);
+                        long accId = long.Parse(Query["accountId"]);
+                        int chrId = int.Parse(Query["charId"]);
+                        deathsQuery = deathsQuery.Where(d => d.AccountId == accId && d.CharacterId == chrId);
                     }
-                    using (MySqlDataReader rdr = cmd.ExecuteReader())
+
+                    var deaths = await deathsQuery.OrderByDescending(d => d.TotalFame).Take(20).ToListAsync();
+
+                    foreach (var death in deaths)
                     {
-                        while (rdr.Read())
-                        {
-                            XmlElement elem = doc.CreateElement("FameListElem");
+                        XmlElement elem = doc.CreateElement("FameListElem");
 
-                            int accId = rdr.GetInt32("accId");
-                            XmlAttribute accIdAttr = doc.CreateAttribute("accountId");
-                            accIdAttr.Value = accId.ToString();
-                            elem.Attributes.Append(accIdAttr);
-                            XmlAttribute chrIdAttr = doc.CreateAttribute("charId");
-                            chrIdAttr.Value = rdr.GetInt32("chrId").ToString();
-                            elem.Attributes.Append(chrIdAttr);
+                        XmlAttribute accIdAttr = doc.CreateAttribute("accountId");
+                        accIdAttr.Value = death.AccountId.ToString();
+                        elem.Attributes.Append(accIdAttr);
+                        XmlAttribute chrIdAttr = doc.CreateAttribute("charId");
+                        chrIdAttr.Value = death.CharacterId.ToString();
+                        elem.Attributes.Append(chrIdAttr);
 
-                            root.AppendChild(elem);
+                        root.AppendChild(elem);
 
-                            XmlElement nameElem = doc.CreateElement("Name");
-                            nameElem.InnerText = String.Empty;
-                            elem.AppendChild(nameElem);
-                            XmlElement objTypeElem = doc.CreateElement("ObjectType");
-                            objTypeElem.InnerText = rdr.GetString("charType");
-                            elem.AppendChild(objTypeElem);
-                            XmlElement tex1Elem = doc.CreateElement("Tex1");
-                            tex1Elem.InnerText = rdr.GetString("tex1");
-                            elem.AppendChild(tex1Elem);
-                            XmlElement tex2Elem = doc.CreateElement("Tex2");
-                            tex2Elem.InnerText = rdr.GetString("tex2");
-                            elem.AppendChild(tex2Elem);
-                            XmlElement skinElem = doc.CreateElement("Texture");
-                            skinElem.InnerText = rdr.GetString("skin");
-                            elem.AppendChild(skinElem);
-                            XmlElement equElem = doc.CreateElement("Equipment");
-                            equElem.InnerText = rdr.GetString("items");
-                            elem.AppendChild(equElem);
-                            XmlElement fameElem = doc.CreateElement("TotalFame");
-                            fameElem.InnerText = rdr.GetString("totalFame");
-                            elem.AppendChild(fameElem);
-                        }
+                        XmlElement nameElem = doc.CreateElement("Name");
+                        nameElem.InnerText = String.Empty;
+                        elem.AppendChild(nameElem);
+                        XmlElement objTypeElem = doc.CreateElement("ObjectType");
+                        objTypeElem.InnerText = death.CharacterType.ToString();
+                        elem.AppendChild(objTypeElem);
+                        XmlElement tex1Elem = doc.CreateElement("Tex1");
+                        tex1Elem.InnerText = death.Tex1.ToString();
+                        elem.AppendChild(tex1Elem);
+                        XmlElement tex2Elem = doc.CreateElement("Tex2");
+                        tex2Elem.InnerText = death.Tex2.ToString();
+                        elem.AppendChild(tex2Elem);
+                        XmlElement skinElem = doc.CreateElement("Texture");
+                        skinElem.InnerText = death.Skin.ToString();
+                        elem.AppendChild(skinElem);
+                        XmlElement equElem = doc.CreateElement("Equipment");
+                        equElem.InnerText = death.Items;
+                        elem.AppendChild(equElem);
+                        XmlElement fameElem = doc.CreateElement("TotalFame");
+                        fameElem.InnerText = death.TotalFame.ToString();
+                        elem.AppendChild(fameElem);
                     }
 
                     XmlNodeList list = doc.SelectNodes("/FameList/FameListElem");
@@ -104,7 +117,11 @@ namespace server.fame
                         foreach (XmlNode xnode in node.ChildNodes)
                         {
                             if (xnode.Name == "Name")
-                                xnode.InnerText = db.GetAccount(node.Attributes["accountId"].Value, Program.GameData).Name;
+                            {
+                                long accId = long.Parse(node.Attributes["accountId"].Value);
+                                var account = await accountRepository.GetByIdAsync(accId);
+                                xnode.InnerText = account?.Name ?? "";
+                            }
                         }
                     }
                 }
@@ -113,6 +130,10 @@ namespace server.fame
                 settings.OmitXmlDeclaration = true;
                 using (XmlWriter wtr = XmlWriter.Create(Context.Response.OutputStream))
                     doc.Save(wtr);
+            }
+            else
+            {
+                Context.Response.OutputStream.Write(status, 0, status.Length);
             }
         }
     }

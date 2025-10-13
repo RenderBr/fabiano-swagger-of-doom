@@ -21,7 +21,7 @@ namespace wServer.realm.entities.player
             {
                 SetTypeSkin setType = null;
                 var item = Inventory[0];
-                if (item != null && !Manager.GameData.SetTypeSkins.TryGetValue((ushort)item.SetType, out setType)) return;
+                if (item != null && !Manager.GameDataService.SetTypeSkins.TryGetValue((ushort)item.SetType, out setType)) return;
 
                 setTypeSkin = setType;
                 if (setTypeBoosts != null || setTypeSkin == null) return;

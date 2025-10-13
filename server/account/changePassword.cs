@@ -1,12 +1,9 @@
 ﻿#region
 
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Web;
-using db;
-using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -14,25 +11,32 @@ namespace server.account
 {
     internal class changePassword : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var account = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            
+            if (account == null)
             {
-                Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-                byte[] status = new byte[0];
-                if (CheckAccount(acc, db))
-                {
-                    MySqlCommand cmd = db.CreateQuery();
-                    cmd.CommandText = "UPDATE accounts SET password=SHA1(@password) WHERE id=@accId;";
-                    cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                    cmd.Parameters.AddWithValue("@password", Query["newPassword"]);
-                    if (cmd.ExecuteNonQuery() > 0)
-                        status = Encoding.UTF8.GetBytes("<Success />");
-                    else
-                        status = Encoding.UTF8.GetBytes("<Error>Internal error</Error>");
-                }
-                Context.Response.OutputStream.Write(status, 0, status.Length);
+                WriteErrorLine("Account not found");
+                return;
             }
+            
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+            
+            var newPassword = Utils.Sha1(Query["newPassword"]);
+            
+            if (newPassword == account.Password)
+            {
+                WriteErrorLine("New password must be different from the old one");
+                return;
+            }
+            
+            account.Password = newPassword;
+            await accountRepository.SaveChangesAsync();
+            WriteLine("<Success />");
         }
     }
 }

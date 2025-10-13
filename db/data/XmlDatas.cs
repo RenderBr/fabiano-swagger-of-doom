@@ -6,24 +6,25 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Xml.Linq;
 using System.Xml.XPath;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 #endregion
 
 namespace db.data
 {
-    public class XmlData : IDisposable
+    public class XmlDataService : IDisposable
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof (XmlData));
+        private static ILogger<XmlDataService> _log;
         private readonly XElement addition;
 
         private readonly Dictionary<string, ushort> id2type_obj;
 
         private readonly Dictionary<string, ushort> id2type_tile;
 
-        private readonly Dictionary<ushort, Item> items;
+        private readonly Dictionary<int, Item> items;
         private readonly Dictionary<ushort, ObjectDesc> objDescs;
         private readonly Dictionary<ushort, PortalDesc> portals;
         private readonly Dictionary<ushort, TileDesc> tiles;
@@ -40,8 +41,11 @@ namespace db.data
         private int updateCount;
         private AutoAssign assign;
 
-        public XmlData(string path = "data")
+        public XmlDataService(ILogger<XmlDataService> logger)
         {
+            string path = "data";
+            _log = logger;
+            
             ObjectTypeToElement = new ReadOnlyDictionary<ushort, XElement>(
                 type2elem_obj = new Dictionary<ushort, XElement>());
 
@@ -60,8 +64,8 @@ namespace db.data
 
             Tiles = new ReadOnlyDictionary<ushort, TileDesc>(
                 tiles = new Dictionary<ushort, TileDesc>());
-            Items = new ReadOnlyDictionary<ushort, Item>(
-                items = new Dictionary<ushort, Item>());
+            Items = new ReadOnlyDictionary<int, Item>(
+                items = new Dictionary<int, Item>());
             ObjectDescs = new ReadOnlyDictionary<ushort, ObjectDesc>(
                 objDescs = new Dictionary<ushort, ObjectDesc>());
             Portals = new ReadOnlyDictionary<ushort, PortalDesc>(
@@ -75,22 +79,20 @@ namespace db.data
 
             addition = new XElement("ExtData");
 
-            assign = new AutoAssign(this);
+            assign = new AutoAssign(this, logger);
 
             string basePath = Path.Combine(AssemblyDirectory, path);
-            log.InfoFormat("Loading game data from '{0}'...", basePath);
+            _log.LogInformation("Loading game data from '{BasePath}'...", basePath);
             string[] xmls = Directory.EnumerateFiles(basePath, "*.xml", SearchOption.AllDirectories).ToArray();
             for (int i = 0; i < xmls.Length; i++)
             {
-                log.InfoFormat("Loading '{0}'({1}/{2})...", xmls[i], i + 1, xmls.Length);
+                _log.LogInformation("Loading '{XmlItem}'({Current}/{Total})...", xmls[i], i + 1, xmls.Length);
                 using (Stream stream = File.OpenRead(xmls[i]))
                     ProcessXml(XElement.Load(stream));
             }
-            log.Info("Finish loading game data.");
-            log.InfoFormat("{0} Items", items.Count);
-            log.InfoFormat("{0} Tiles", tiles.Count);
-            log.InfoFormat("{0} Objects", objDescs.Count);
-            log.InfoFormat("{0} Additions", addition.Elements().Count());
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("XML Game data loaded from " + xmls.Length + " files:");
+            sb.AppendLine($"| {items.Count} items | {tiles.Count} tiles | {objDescs.Count} objects | {addition.Elements().Count()} additions");
         }
 
         private static string AssemblyDirectory
@@ -110,7 +112,7 @@ namespace db.data
         public IDictionary<string, ushort> IdToTileType { get; private set; }
 
         public IDictionary<ushort, TileDesc> Tiles { get; private set; }
-        public IDictionary<ushort, Item> Items { get; private set; }
+        public IDictionary<int, Item> Items { get; private set; }
         public IDictionary<ushort, ObjectDesc> ObjectDescs { get; private set; }
         public IDictionary<ushort, PortalDesc> Portals { get; private set; }
         public IDictionary<ushort, PetStruct> TypeToPet { get; private set; }
@@ -172,9 +174,9 @@ namespace db.data
                 if (cls == "PetBehavior" || cls == "PetAbility") continue;
 
                 if (type2id_obj.ContainsKey(type))
-                    log.WarnFormat("'{0}' and '{1}' has the same ID of 0x{2:x4}!", id, type2id_obj[type], type);
+                    _log.LogWarning("'{FirstId}' and '{SecondID}' has the same ID of 0x{Type:x4}!", id, type2id_obj[type], type);
                 if (id2type_obj.ContainsKey(id))
-                    log.WarnFormat("0x{0:x4} and 0x{1:x4} has the same name of {2}!", type, id2type_obj[id], id);
+                    _log.LogWarning("0x{FirstId:x4} and 0x{SecondId:x4} has the same name of {ID}!", type, id2type_obj[id], id);
 
                 type2id_obj[type] = id;
                 id2type_obj[id] = type;
@@ -224,7 +226,18 @@ namespace db.data
                 }
             }
         }
+        
+        public Item GetItem(ushort type)
+        {
+            Item item;
+            if (items.TryGetValue(type, out item))
+            {
+                return item;
+            }
 
+            _log.LogWarning("Item not found: {Type}", type);
+            return null;
+        }
         public void AddGrounds(XElement root)
         {
             foreach (XElement elem in root.XPathSelectElements("//Ground"))
@@ -239,9 +252,9 @@ namespace db.data
                     type = (ushort)Utils.FromString(typeAttr.Value);
 
                 if (type2id_tile.ContainsKey(type))
-                    log.WarnFormat("'{0}' and '{1}' has the same ID of 0x{2:x4}!", id, type2id_tile[type], type);
+                    _log.LogWarning("'{FirstID}' and '{SecondID}' has the same ID of 0x{Type:x4}!", id, type2id_tile[type], type);
                 if (id2type_tile.ContainsKey(id))
-                    log.WarnFormat("0x{0:x4} and 0x{1:x4} has the same name of {2}!", type, id2type_tile[id], id);
+                    _log.LogWarning("0x{FirstType:x4} and 0x{SecondType:x4} has the same name of {ID}!", type, id2type_tile[id], id);
 
                 type2id_tile[type] = id;
                 id2type_tile[id] = type;
@@ -277,12 +290,12 @@ namespace db.data
 
         private class AutoAssign : SimpleSettings
         {
-            private XmlData dat;
+            private XmlDataService dat;
             private int nextFullId;
             private int nextSignedId;
 
-            internal AutoAssign(XmlData dat)
-                : base("autoId")
+            internal AutoAssign(XmlDataService dat, ILogger logger)
+                : base("autoId", logger)
             {
                 this.dat = dat;
                 nextSignedId = GetValue<int>("nextSigned", "50000"); //0xC350
@@ -308,7 +321,7 @@ namespace db.data
                         SetValue("nextSigned", nextSignedId.ToString());
                     }
                     SetValue(id, type.ToString());
-                    log.InfoFormat("Auto assigned '{0}' to 0x{1:x4}", id, type);
+                    _log.LogInformation("Auto assigned '{ID}' to 0x{Type:x4}", id, type);
                 }
                 return type;
             }

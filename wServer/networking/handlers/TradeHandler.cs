@@ -1,5 +1,7 @@
 ﻿#region
 
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 
 #endregion
@@ -13,9 +15,10 @@ namespace wServer.networking.handlers
             get { return PacketID.REQUESTTRADE; }
         }
 
-        protected override void HandlePacket(Client client, RequestTradePacket packet)
+        protected override Task HandlePacket(Client client, RequestTradePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => client.Player.RequestTrade(t, packet));
+            return Task.CompletedTask;
         }
     }
 
@@ -26,9 +29,16 @@ namespace wServer.networking.handlers
             get { return PacketID.CHANGETRADE; }
         }
 
-        protected override void HandlePacket(Client client, ChangeTradePacket packet)
+        protected override Task HandlePacket(Client client, ChangeTradePacket packet)
         {
-            client.Manager.Logic.AddPendingAction(t => client.Player.ChangeTrade(t, packet));
+            if (client?.Player == null)
+            {
+                Program.Logger.LogWarning("Received ChangeTradePacket from null player");
+                return Task.CompletedTask; // Player not loaded or disconnected
+            }
+
+            client.Manager?.Logic.AddPendingAction(t => { client.Player?.ChangeTrade(t, packet); });
+            return Task.CompletedTask;
         }
     }
 
@@ -39,9 +49,10 @@ namespace wServer.networking.handlers
             get { return PacketID.ACCEPTTRADE; }
         }
 
-        protected override void HandlePacket(Client client, AcceptTradePacket packet)
+        protected override Task HandlePacket(Client client, AcceptTradePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => client.Player.AcceptTrade(t, packet));
+            return Task.CompletedTask;
         }
     }
 
@@ -52,9 +63,10 @@ namespace wServer.networking.handlers
             get { return PacketID.CANCELTRADE; }
         }
 
-        protected override void HandlePacket(Client client, CancelTradePacket packet)
+        protected override Task HandlePacket(Client client, CancelTradePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => client.Player.CancelTrade(t, packet));
+            return Task.CompletedTask;
         }
     }
 }

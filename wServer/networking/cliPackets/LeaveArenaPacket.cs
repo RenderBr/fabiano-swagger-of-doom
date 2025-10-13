@@ -12,7 +12,7 @@ namespace wServer.networking.cliPackets
 
         public override PacketID ID
         {
-            get { return PacketID.LEAVEARENA; }
+            get { return PacketID.ARENA_DEATH; }
         }
 
         public override Packet CreateInstance()

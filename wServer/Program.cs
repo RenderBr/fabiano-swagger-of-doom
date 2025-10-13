@@ -1,123 +1,193 @@
-﻿#region
-
-using System;
+﻿using System;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 using db;
-using log4net;
-using log4net.Config;
+using db.data;
+using db.Repositories;
+using db.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Configuration;
+using RageRealm.Shared.Configuration.WorldServer;
+using wServer.Factories;
 using wServer.networking;
 using wServer.realm;
-using System.Net.Mail;
-using System.Net;
 
-#endregion
-
-namespace wServer
+internal class Program
 {
-    internal static class Program
+    public static bool WhiteList { get; private set; }
+    public static bool Verify { get; private set; }
+
+    public static ILogger Logger { get; private set; }
+    private static RealmManager manager;
+
+    public static WorldServerConfiguration Config { get; private set; } = new();
+    public static DateTime WhiteListTurnOff { get; private set; }
+    public static ServiceProvider Services { get; set; }
+
+    private static async Task Main(string[] args)
     {
-        public static bool WhiteList { get; private set; }
-        public static bool Verify { get; private set; }
-        internal static SimpleSettings Settings;
+        Console.Title = "RealmRage - World Server";
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        Directory.SetCurrentDirectory(AppContext.BaseDirectory);
 
-        private static readonly ILog log = LogManager.GetLogger("Server");
-        private static RealmManager manager;
-
-        public static DateTime WhiteListTurnOff { get; private set; }
-
-        private static void Main(string[] args)
+        try
         {
-            Console.Title = "Fabiano Swagger of Doom - World Server";
-            try
+            var configBuilder = new ConfigurationBuilder()
+                .SetBasePath(AppContext.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+
+            var configuration = configBuilder.Build();
+            
+            Config = configuration.Get<WorldServerConfiguration>();
+
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+            Thread.CurrentThread.Name = "Entry";
+
+            // setup DI
+            var serviceBuilder = new ServiceCollection();
+            serviceBuilder.AddSingleton(Config);
+
+            // Initialize Logging Service
+            serviceBuilder.AddLogging(builder =>
             {
-                XmlConfigurator.ConfigureAndWatch(new FileInfo("log4net_wServer.config"));
+                builder.ClearProviders();
 
-                Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-                Thread.CurrentThread.Name = "Entry";
-
-                Settings = new SimpleSettings("wServer");
-                new Database(
-                    Settings.GetValue<string>("db_host", "127.0.0.1"),
-                    Settings.GetValue<string>("db_database", "rotmgprod"),
-                    Settings.GetValue<string>("db_user", "root"),
-                    Settings.GetValue<string>("db_auth", ""));
-
-                manager = new RealmManager(
-                    Settings.GetValue<int>("maxClients", "100"),
-                    Settings.GetValue<int>("tps", "20"));
-
-                WhiteList = Settings.GetValue<bool>("whiteList", "false");
-                Verify = Settings.GetValue<bool>("verifyEmail", "false");
-                WhiteListTurnOff = Settings.GetValue<DateTime>("whitelistTurnOff");
-
-                manager.Initialize();
-                manager.Run();
-
-                Server server = new Server(manager);
-                PolicyServer policy = new PolicyServer();
-
-                Console.CancelKeyPress += (sender, e) => e.Cancel = true;
-
-                policy.Start();
-                server.Start();
-                if(Settings.GetValue<bool>("broadcastNews", "false") && File.Exists("news.txt"))
-                    new Thread(autoBroadcastNews).Start();
-                log.Info("Server initialized.");
-
-                uint key = 0;
-                while ((key = (uint)Console.ReadKey(true).Key) != (uint)ConsoleKey.Escape)
+                builder.AddSimpleConsole(options =>
                 {
-                    if (key == (2 | 80))
-                        Settings.Reload();
+                    options.SingleLine = true;
+                    options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
+                    options.IncludeScopes = false;
+                    options.UseUtcTimestamp = true;
+                });
+                
+                if (!Enum.TryParse(Config.Logging.LogLevel, true, out LogLevel logLevel))
+                {
+                    logLevel = LogLevel.Information;
                 }
 
-                log.Info("Terminating...");
-                server.Stop();
-                policy.Stop();
-                manager.Stop();
-                log.Info("Server terminated.");
-            }
-            catch (Exception e)
-            {
-                log.Fatal(e);
+                builder.SetMinimumLevel(logLevel);
 
-                foreach (var c in manager.Clients)
+                if (Config.Logging.EnableConsole)
                 {
-                    c.Value.Disconnect();
+                    builder.AddConsole();
                 }
-                Console.ReadLine();
-            }
-        }
 
-        public static void SendEmail(MailMessage message, bool enableSsl = true)
-        {
-            SmtpClient client = new SmtpClient
+                if (Config.Logging.EnableDebug)
+                {
+                    builder.AddDebug();
+                }
+
+                if (Config.Logging.EnableFile && !string.IsNullOrEmpty(Config.Logging.FilePath))
+                {
+                    builder.AddFile(Config.Logging.FilePath);
+                }
+            });
+
+            var connString =
+                $"server={Config.Database.Host};userid={Config.Database.User};password={Config.Database.Password};database={Config.Database.Name};SslMode=none;Convert Zero Datetime=True;";
+            serviceBuilder.AddDbContext<ServerDbContext>(options =>
+                options.UseMySql(connString, ServerVersion.AutoDetect(connString)));
+
+            // register your services/repositories
+            serviceBuilder.AddScoped<IUnitOfWork, UnitOfWork>();
+            serviceBuilder.AddScoped<AccountService>();
+            serviceBuilder.AddScoped<IAccountRepository, AccountRepository>();
+            serviceBuilder.AddScoped<ICharacterRepository, CharacterRepository>();
+            serviceBuilder.AddScoped<IDailyQuestRepository, DailyQuestRepository>();
+            serviceBuilder.AddScoped<IDeathRepository, DeathRepository>();
+            serviceBuilder.AddScoped<IGuildRepository, GuildRepository>();
+            serviceBuilder.AddScoped<INewsRepository, NewsRepository>();
+            serviceBuilder.AddScoped<IPetRepository, PetRepository>();
+            serviceBuilder.AddScoped<IVaultRepository, VaultRepository>();
+            serviceBuilder.AddScoped<IStatRepository, StatRepository>();
+            
+            serviceBuilder.AddSingleton<XmlDataService>();
+            
+            serviceBuilder.Configure<RealmConfiguration>(configuration.GetSection("Realm"));
+            serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
+            serviceBuilder.AddSingleton<RealmManager>();
+
+            Services = serviceBuilder.BuildServiceProvider();
+            Logger = Services.GetRequiredService<ILogger<Program>>();
+
+            // create the realm manager
+            manager = Services.GetRequiredService<RealmManager>();
+            WhiteList = Config.Realm.Whitelist;
+            Verify = Config.Realm.VerifyEmail;
+            WhiteListTurnOff = Config.Realm.WhitelistTurnOff;
+
+            manager.Initialize();
+            manager.RunAsync();
+
+            // create the servers
+            var server = new Server(manager);
+            var policy = new PolicyServer();
+
+            Console.CancelKeyPress += (_, e) =>
             {
-                Host = Settings.GetValue<string>("smtpHost", "smtp.gmail.com"),
-                Port = Settings.GetValue<int>("smtpPort", "587"),
-                DeliveryMethod = SmtpDeliveryMethod.Network,
-                UseDefaultCredentials = false,
-                EnableSsl = true,
-                Credentials =
-                    new NetworkCredential(Settings.GetValue<string>("serverEmail"),
-                        Settings.GetValue<string>("serverEmailPassword"))
+                e.Cancel = true;
+                Logger.LogInformation("Ctrl+C detected. Shutting down...");
+                _ = ShutdownAsync(server, policy); // fire & forget async shutdown
             };
 
-            client.Send(message);
-        }
+            await policy.StartAsync();
+            await server.StartAsync();
 
-        private static void autoBroadcastNews()
+            if (Config.Realm.BroadcastNews && File.Exists("news.txt"))
+                _ = Task.Run(AutoBroadcastNews);
+
+            Logger.LogInformation("Server initialized. Press ESC to exit...");
+
+            while (Console.ReadKey(true).Key != ConsoleKey.Escape)
+                await Task.Delay(50);
+
+            await ShutdownAsync(server, policy);
+        }
+        catch (Exception e)
         {
-                var news = File.ReadAllLines("news.txt");
-                do
-                {
-                    ChatManager cm = new ChatManager(manager);
-                    cm.News(news[new Random().Next(news.Length)]);
-                    Thread.Sleep(300000); //5 min
-                }
-                while (true);
+            Logger.LogCritical(e, "Fatal error during initialization");
+            if (manager != null)
+            {
+                foreach (var c in manager.Clients.Values)
+                    c.Disconnect();
             }
+
+            Console.ReadLine();
+        }
+    }
+
+    private static async Task ShutdownAsync(Server server, PolicyServer policy)
+    {
+        try
+        {
+            Logger.LogInformation("Terminating...");
+            await server.StopAsync();
+            await policy.StopAsync();
+            await manager.StopAsync();
+            Logger.LogInformation("Server terminated.");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during shutdown");
+        }
+    }
+
+    private static async Task AutoBroadcastNews()
+    {
+        var news = await File.ReadAllLinesAsync("news.txt");
+        var rand = new Random();
+        var cm = new ChatManager(manager);
+
+        while (true)
+        {
+            cm.News(news[rand.Next(news.Length)]);
+            await Task.Delay(TimeSpan.FromMinutes(5));
+        }
     }
 }

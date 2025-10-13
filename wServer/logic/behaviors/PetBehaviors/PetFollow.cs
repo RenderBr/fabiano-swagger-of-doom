@@ -1,4 +1,5 @@
 ﻿using Mono.Game;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 using wServer.realm.entities.player;

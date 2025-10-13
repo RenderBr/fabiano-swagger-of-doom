@@ -1,5 +1,7 @@
 ﻿#region
 
+using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.realm.entities.player;
@@ -15,7 +17,7 @@ namespace wServer.networking.handlers
             get { return PacketID.MOVE; }
         }
 
-        protected override void HandlePacket(Client client, MovePacket packet)
+        protected override Task HandlePacket(Client client, MovePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -46,6 +48,7 @@ namespace wServer.networking.handlers
 
                 client.Player.ClientTick(t, packet);
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
 
         private static void CheckLabConditions(Entity player, MovePacket packet)

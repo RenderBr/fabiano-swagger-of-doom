@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using RageRealm.Shared.Models;
 using wServer.logic;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;

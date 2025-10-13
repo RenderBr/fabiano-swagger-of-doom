@@ -1,13 +1,10 @@
 ﻿#region
 
-using db;
 using System;
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
 using System.Net.Mail;
-using System.Text;
-using System.Web;
+using System.Threading.Tasks;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -15,32 +12,31 @@ namespace server.account
 {
     internal class forgotPassword : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
-            {
-                string authKey = Database.GenerateRandomString(128);
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "UPDATE accounts SET authToken=@authToken WHERE uuid=@email;";
-                cmd.Parameters.AddWithValue("@authToken", authKey);
-                cmd.Parameters.AddWithValue("@email", Query["guid"]);
-                if (cmd.ExecuteNonQuery() == 1)
-                {
-                    MailMessage message = new MailMessage();
-                    message.To.Add(Query["guid"]);
-                    message.Subject = "Forgot Password";
-                    message.From = new MailAddress(Program.Settings.GetValue<string>("serverEmail", ""), "Forgot Passowrd");
-                    message.Body = emailBody.
-                        Replace("{RPLINK}", String.Format("{0}/{1}{2}", Program.Settings.GetValue<string>("serverDomain", "localhost"), "account/resetPassword?authToken=", authKey)).
-                        Replace("{SUPPORTLINK}", String.Format("{0}", Program.Settings.GetValue<string>("supportLink", "localhost"))).
-                        Replace("{SERVERDOMAIN}", Program.Settings.GetValue<string>("serverDomain", "localhost"));
+            using var scope = Program.Services.CreateScope();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
 
-                    Program.SendEmail(message, true);
-                }
-                else
-                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                        wtr.Write("<Error>Error.accountNotFound</Error>");
+            var account = await accountRepository.GetByUuidAsync(Query["guid"]);
+            if (account != null)
+            {
+                string authKey = Utils.GenerateRandomString(128);
+                account.AuthToken = authKey;
+                await accountRepository.SaveChangesAsync();
+
+                MailMessage message = new MailMessage();
+                message.To.Add(Query["guid"]);
+                message.Subject = "Forgot Password";
+                message.From = new MailAddress(Program.Config.Smtp.Email, "Forgot Password");
+                message.Body = emailBody.
+                    Replace("{RPLINK}", String.Format("{0}/{1}{2}", Program.Config.ServerDomain, "account/resetPassword?authToken=", authKey)).
+                    Replace("{SUPPORTLINK}", String.Format("{0}", Program.Config.SupportDomain)).
+                    Replace("{SERVERDOMAIN}", Program.Config.ServerDomain);
+
+                await Program.SendEmailAsync(message, true);
             }
+            else
+                WriteErrorLine("Error.accountNotFound");
         }
 
         const string emailBody = @"Hello,

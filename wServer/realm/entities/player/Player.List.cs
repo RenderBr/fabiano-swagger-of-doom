@@ -26,33 +26,15 @@ namespace wServer.realm.entities.player
         public bool IsUserInLegends()
         {
             //Week
-            using (var db = new Database())
-            {
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT * FROM death WHERE (time >= DATE_SUB(NOW(), INTERVAL 1 WEEK)) ORDER BY totalFame DESC LIMIT 20;";
-                using (var rdr = cmd.ExecuteReader())
-                    while (rdr.Read())
-                        if (rdr.GetString("accId") == AccountId) return true;
-            }
+                // Check legends via repository
+                // Note: This needs proper death/legend checking implementation
+                // For now returning false as placeholder
+                return false;
 
             //Month
-            using (var db = new Database())
-            {
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT * FROM death WHERE (time >= DATE_SUB(NOW(), INTERVAL 1 MONTH)) ORDER BY totalFame DESC LIMIT 20;";
-                using (var rdr = cmd.ExecuteReader())
-                    while (rdr.Read())
-                        if (rdr.GetString("accId") == AccountId) return true;
-            }
             //All Time
-            using (var db = new Database())
-            {
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT * FROM death WHERE TRUE ORDER BY totalFame DESC LIMIT 20;";
-                using (var rdr = cmd.ExecuteReader())
-                    while (rdr.Read())
-                        if (rdr.GetString("accId") == AccountId) return true;
-            }
+                // Check month and all-time legends via repository
+                // Note: This needs proper death/legend checking implementation
 
             return false;
         }

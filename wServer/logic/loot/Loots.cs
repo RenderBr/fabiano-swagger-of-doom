@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -106,7 +107,7 @@ namespace wServer.logic.loot
         private Item IncreaseTier(RealmManager manager, Item item, List<LootDef> consideration)
         {
             if (item.SlotType == 10) return item;
-            Item[] tier = manager.GameData.Items
+            Item[] tier = manager.GameDataService.Items
                  .Where(i => item.SlotType == i.Value.SlotType)
                  .Where(i => i.Value.Tier >= item.Tier + 3)
                  .Where(i => consideration.Select(_ => _.Item).Contains(i.Value))

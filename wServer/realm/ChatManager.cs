@@ -2,7 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using log4net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using wServer.realm.entities;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
@@ -12,17 +13,17 @@ namespace wServer.realm
 {
     public class ChatManager
     {
-        static ILog log = LogManager.GetLogger(typeof(ChatManager));
-
+        private readonly ILogger<ChatManager> _logger;
         RealmManager manager;
         public ChatManager(RealmManager manager)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<ChatManager>>();
             this.manager = manager;
         }
 
         public void Say(Player src, string text)
         {
-            src.Owner.BroadcastPacketSync(new TextPacket()
+            src.BroadcastSync(new TextPacket()
             {
                 Name = (src.Client.Account.Rank >= 2 ? "@" : src.Client.Account.Rank >= 1 ? "#" : "") + src.Name,
                 ObjectId = src.Id,
@@ -32,8 +33,8 @@ namespace wServer.realm
                 Text = text.ToSafeText(),
                 CleanText = text.ToSafeText()
             }, p => !p.Ignored.Contains(src.AccountId));
-            log.InfoFormat("[{0}({1})] <{2}> {3}", src.Owner.Name, src.Owner.Id, src.Name, text);
-            src.Owner.ChatReceived(text);
+            _logger?.LogInformation("[{WorldName}({WorldId})] <{PlayerName}> {Message}", src.Owner.Name, src.Owner.Id, src.Name, text);
+            src.Owner.ChatReceived(src, text);
         }
 
         public void SayGuild(Player src, string text)
@@ -66,7 +67,7 @@ namespace wServer.realm
                     Name = "@NEWS",
                     Text = text.ToSafeText()
                 });
-            log.InfoFormat("<NEWS> {0}", text);
+            _logger?.LogInformation("<NEWS> {NewsText}", text);
         }
 
         public void Announce(string text)
@@ -79,7 +80,7 @@ namespace wServer.realm
                     Name = "@Announcement",
                     Text = text.ToSafeText()
                 });
-            log.InfoFormat("<Announcement> {0}", text);
+            _logger?.LogInformation("<Announcement> {AnnouncementText}", text);
         }
 
         public void Oryx(World world, string text)
@@ -91,7 +92,7 @@ namespace wServer.realm
                 Name = "#Oryx the Mad God",
                 Text = text.ToSafeText()
             }, null);
-            log.InfoFormat("[{0}({1})] <Oryx the Mad God> {2}", world.Name, world.Id, text);
+            _logger?.LogInformation("[{WorldName}({WorldId})] <Oryx the Mad God> {OryxMessage}", world.Name, world.Id, text);
         }
     }
 }

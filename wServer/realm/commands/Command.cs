@@ -2,7 +2,10 @@
 
 using System;
 using System.Collections.Generic;
-using log4net;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
 
 #endregion
@@ -11,10 +14,11 @@ namespace wServer.realm.commands
 {
     public abstract class Command
     {
-        protected static readonly ILog log = LogManager.GetLogger(typeof (Command));
+        protected readonly ILogger<Command> _logger;
 
         public Command(string name, int permLevel = 0)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<Command>>();
             CommandName = name;
             PermissionLevel = permLevel;
         }
@@ -22,7 +26,7 @@ namespace wServer.realm.commands
         public string CommandName { get; private set; }
         public int PermissionLevel { get; private set; }
 
-        protected abstract bool Process(Player player, RealmTime time, string[] args);
+        protected abstract Task Process(Player player, RealmTime time, string[] args);
 
         private static int GetPermissionLevel(Player player)
         {
@@ -50,11 +54,11 @@ namespace wServer.realm.commands
             try
             {
                 string[] a = args.Split(' ');
-                return Process(player, time, a);
+                return Process(player, time, a).IsCompletedSuccessfully;
             }
             catch (Exception ex)
             {
-                log.Error("Error when executing the command.", ex);
+                _logger?.LogError(ex, "Error when executing the command");
                 player.SendError("Error when executing the command.");
                 return false;
             }
@@ -63,14 +67,13 @@ namespace wServer.realm.commands
 
     public class CommandManager
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof (CommandManager));
-
+        private readonly ILogger<CommandManager> _logger;
         private readonly Dictionary<string, Command> cmds;
-
         private RealmManager manager;
 
         public CommandManager(RealmManager manager)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<CommandManager>>();
             this.manager = manager;
             cmds = new Dictionary<string, Command>(StringComparer.InvariantCultureIgnoreCase);
             Type t = typeof (Command);
@@ -99,7 +102,7 @@ namespace wServer.realm.commands
                 player.SendError("Unknown command!");
                 return false;
             }
-            log.InfoFormat("[Command] <{0}> {1}", player.Name, text);
+            _logger?.LogInformation("[Command] <{PlayerName}> {CommandText}", player.Name, text);
             return command.Execute(player, time, args);
         }
     }

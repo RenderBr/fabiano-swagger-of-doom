@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -13,61 +14,72 @@ public class NWriter : BinaryWriter
         : base(s, Encoding.UTF8)
     {
     }
-
+    
     public override void Write(short value)
     {
-        base.Write(IPAddress.HostToNetworkOrder(value));
+        Span<byte> arr = stackalloc byte[2];
+        BinaryPrimitives.WriteInt16BigEndian(arr, value);
+        base.Write(arr);
     }
-
+    
     public override void Write(int value)
     {
-        base.Write(IPAddress.HostToNetworkOrder(value));
+        Span<byte> arr = stackalloc byte[4];
+        BinaryPrimitives.WriteInt32BigEndian(arr, value);
+        base.Write(arr);
     }
-
+    
     public override void Write(long value)
     {
-        base.Write(IPAddress.HostToNetworkOrder(value));
+        Span<byte> arr = stackalloc byte[8];
+        BinaryPrimitives.WriteInt64BigEndian(arr, value);
+        base.Write(arr);
     }
-
+    
     public override void Write(ushort value)
     {
-        base.Write((ushort) IPAddress.HostToNetworkOrder((short) value));
+        Span<byte> arr = stackalloc byte[2];
+        BinaryPrimitives.WriteUInt16BigEndian(arr, value);
+        base.Write(arr);
     }
-
+    
     public override void Write(uint value)
     {
-        base.Write((uint) IPAddress.HostToNetworkOrder((int) value));
+        Span<byte> arr = stackalloc byte[4];
+        BinaryPrimitives.WriteUInt32BigEndian(arr, value);
+        base.Write(arr);
     }
-
+    
     public override void Write(ulong value)
     {
-        base.Write((ulong) IPAddress.HostToNetworkOrder((long) value));
+        Span<byte> arr = stackalloc byte[8];
+        BinaryPrimitives.WriteUInt64BigEndian(arr, value);
+        base.Write(arr);
     }
-
+    
     public override void Write(float value)
     {
-        byte[] b = BitConverter.GetBytes(value);
-        Array.Reverse(b);
-        base.Write(b);
+        byte[] arr = BitConverter.GetBytes(value);
+        Array.Reverse(arr);
+        base.Write(arr);
     }
-
+    
     public override void Write(double value)
     {
-        byte[] b = BitConverter.GetBytes(value);
-        Array.Reverse(b);
-        base.Write(b);
+        byte[] arr = BitConverter.GetBytes(value);
+        Array.Reverse(arr);
+        base.Write(arr);
     }
-
-    public void WriteNullTerminatedString(string str)
+    
+    public override void Write(bool value)
     {
-        Write(Encoding.UTF8.GetBytes(str));
-        Write((byte) 0);
+        base.Write(value ? (byte) 1 : (byte) 0);
     }
 
     public void WriteUTF(string str)
     {
         if (str == null)
-            Write((short) 0);
+            Write((short)0);
         else
         {
             var bytes = Encoding.UTF8.GetBytes(str);

@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
-using log4net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
 
@@ -18,7 +20,7 @@ namespace wServer.realm.entities.merchant
         private const int BUY_NO_FAME = 6;
         private const int BUY_NO_FORTUNETOKENS = 9;
         private const int MERCHANT_SIZE = 100;
-        private static readonly ILog log = LogManager.GetLogger(typeof(Merchants));
+        private readonly ILogger<Merchants> _logger;
 
         private readonly Dictionary<int, Tuple<int, CurrencyType>> prices = MerchantLists.prices;
 
@@ -31,6 +33,7 @@ namespace wServer.realm.entities.merchant
         public Merchants(RealmManager manager, ushort objType, World owner = null)
             : base(manager, objType)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<Merchants>>();
             MType = -1;
             Size = MERCHANT_SIZE;
             if (owner != null)
@@ -89,99 +92,101 @@ namespace wServer.realm.entities.merchant
 
         public override void Buy(Player player)
         {
-            Manager.Database.DoActionAsync(db =>
-            {
-                if (ObjectType == 0x01ca) //Merchant
-                {
-                    if (TryDeduct(player))
-                    {
-                        for (var i = 0; i < player.Inventory.Length; i++)
-                        {
-                            try
-                            {
-                                XElement ist;
-                                Manager.GameData.ObjectTypeToElement.TryGetValue((ushort)MType, out ist);
-                                if (player.Inventory[i] == null &&
-                                    (player.SlotTypes[i] == 10 ||
-                                     player.SlotTypes[i] == Convert.ToInt16(ist.Element("SlotType").Value)))
-                                // Exploit fix - No more mnovas as weapons!
-                                {
-                                    player.Inventory[i] = Manager.GameData.Items[(ushort)MType];
-
-                                    if (Currency == CurrencyType.Fame)
-                                        player.CurrentFame =
-                                            player.Client.Account.Stats.Fame =
-                                                db.UpdateFame(player.Client.Account, -Price);
-                                    if (Currency == CurrencyType.Gold)
-                                        player.Credits =
-                                            player.Client.Account.Credits =
-                                                db.UpdateCredit(player.Client.Account, -Price);
-                                    if (Currency == CurrencyType.FortuneTokens)
-                                        player.Tokens =
-                                            player.Client.Account.FortuneTokens =
-                                                db.UpdateFortuneToken(player.Client.Account, -Price);
-
-                                    player.Client.SendPacket(new BuyResultPacket
-                                    {
-                                        Result = 0,
-                                        Message = "{\"key\":\"server.buy_success\"}"
-                                    });
-                                    MRemaining--;
-                                    player.UpdateCount++;
-                                    player.SaveToCharacter();
-                                    UpdateCount++;
-                                    return;
-                                }
-                            }
-                            catch (Exception e)
-                            {
-                                log.Error(e);
-                            }
-                        }
-                        player.Client.SendPacket(new BuyResultPacket
-                        {
-                            Result = 0,
-                            Message = "{\"key\":\"server.inventory_full\"}"
-                        });
-                    }
-                    else
-                    {
-                        if (player.Stars < RankReq)
-                        {
-                            player.Client.SendPacket(new BuyResultPacket
-                            {
-                                Result = 0,
-                                Message = "Not enough stars!"
-                            });
-                            return;
-                        }
-                        switch (Currency)
-                        {
-                            case CurrencyType.Gold:
-                                player.Client.SendPacket(new BuyResultPacket
-                                {
-                                    Result = BUY_NO_GOLD,
-                                    Message = "{\"key\":\"server.not_enough_gold\"}"
-                                });
-                                break;
-                            case CurrencyType.Fame:
-                                player.Client.SendPacket(new BuyResultPacket
-                                {
-                                    Result = BUY_NO_FAME,
-                                    Message = "{\"key\":\"server.not_enough_fame\"}"
-                                });
-                                break;
-                            case CurrencyType.FortuneTokens:
-                                player.Client.SendPacket(new BuyResultPacket
-                                {
-                                    Result = BUY_NO_FORTUNETOKENS,
-                                    Message = "{\"key\":\"server.not_enough_fortunetokens\"}"
-                                });
-                                break;
-                        }
-                    }
-                }
-            });
+            // Manager.Database.DoActionAsync(db =>
+            // {
+            //     if (ObjectType != 0x01ca) //Merchant
+            //     {
+            //         return;
+            //     } 
+            //
+            //     if (TryDeduct(player))
+            //     {
+            //         for (var i = 0; i < player.Inventory.Length; i++)
+            //         {
+            //             try
+            //             {
+            //                 XElement ist;
+            //                 Manager.GameData.ObjectTypeToElement.TryGetValue((ushort)MType, out ist);
+            //                 if (player.Inventory[i] == null &&
+            //                     (player.SlotTypes[i] == 10 ||
+            //                      player.SlotTypes[i] == Convert.ToInt16(ist.Element("SlotType").Value)))
+            //                     // Exploit fix - No more mnovas as weapons!
+            //                 {
+            //                     player.Inventory[i] = Manager.GameData.Items[(ushort)MType];
+            //
+            //                     if (Currency == CurrencyType.Fame)
+            //                         player.CurrentFame =
+            //                             player.Client.Account.Stats.Fame =
+            //                                 player.Client.Account.Stats.Fame = (db.UpdateFameAsync(player.Client.Account, -Price)).GetAwaiter().GetResult();
+            //                     if (Currency == CurrencyType.Gold)
+            //                         player.Credits =
+            //                             player.Client.Account.Credits =
+            //                                 db.UpdateCredit(player.Client.Account, -Price);
+            //                     if (Currency == CurrencyType.FortuneTokens)
+            //                         player.Tokens =
+            //                             player.Client.Account.FortuneTokens =
+            //                                 db.UpdateFortuneTokenAsync(player.Client.Account, -Price).GetAwaiter().GetResult();
+            //
+            //                     player.Client.SendPacket(new BuyResultPacket
+            //                     {
+            //                         Result = 0,
+            //                         Message = "{\"key\":\"server.buy_success\"}"
+            //                     });
+            //                     MRemaining--;
+            //                     player.UpdateCount++;
+            //                     player.SaveToCharacter();
+            //                     UpdateCount++;
+            //                     return;
+            //                 }
+            //             }
+            //             catch (Exception e)
+            //             {
+            //                 log.Error(e);
+            //             }
+            //         }
+            //         player.Client.SendPacket(new BuyResultPacket
+            //         {
+            //             Result = 0,
+            //             Message = "{\"key\":\"server.inventory_full\"}"
+            //         });
+            //     }
+            //     else
+            //     {
+            //         if (player.Stars < RankReq)
+            //         {
+            //             player.Client.SendPacket(new BuyResultPacket
+            //             {
+            //                 Result = 0,
+            //                 Message = "Not enough stars!"
+            //             });
+            //             return;
+            //         }
+            //         switch (Currency)
+            //         {
+            //             case CurrencyType.Gold:
+            //                 player.Client.SendPacket(new BuyResultPacket
+            //                 {
+            //                     Result = BUY_NO_GOLD,
+            //                     Message = "{\"key\":\"server.not_enough_gold\"}"
+            //                 });
+            //                 break;
+            //             case CurrencyType.Fame:
+            //                 player.Client.SendPacket(new BuyResultPacket
+            //                 {
+            //                     Result = BUY_NO_FAME,
+            //                     Message = "{\"key\":\"server.not_enough_fame\"}"
+            //                 });
+            //                 break;
+            //             case CurrencyType.FortuneTokens:
+            //                 player.Client.SendPacket(new BuyResultPacket
+            //                 {
+            //                     Result = BUY_NO_FORTUNETOKENS,
+            //                     Message = "{\"key\":\"server.not_enough_fortunetokens\"}"
+            //                 });
+            //                 break;
+            //         }
+            //     }
+            // });
         }
 
         public override void Tick(RealmTime time)
@@ -241,7 +246,7 @@ namespace wServer.realm.entities.merchant
             }
             catch (Exception ex)
             {
-                log.Error(ex);
+                _logger?.LogError(ex, "Error in merchants tick");
             }
         }
 
@@ -257,7 +262,7 @@ namespace wServer.realm.entities.merchant
             }
             catch (Exception e)
             {
-                log.Error(e);
+                _logger?.LogError(e, "Error spawning merchant");
             }
         }
 

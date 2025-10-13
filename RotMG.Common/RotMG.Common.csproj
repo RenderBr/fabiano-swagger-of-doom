@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <ApplicationVersion>1.0.0.0</ApplicationVersion>
+    <RootNamespace>RotMG</RootNamespace>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <Description>Common utility library for RotMG</Description>
+    <Product>RotMG.Common</Product>
+    <Copyright>Copyright (C) creepylava 2014</Copyright>
+    <FileVersion>1.0.0.0</FileVersion>
+    <AssemblyTitle>RotMG.Common</AssemblyTitle>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="9.0.9" />
+  </ItemGroup>
+</Project>

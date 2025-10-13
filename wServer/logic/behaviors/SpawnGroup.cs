@@ -1,6 +1,7 @@
 ﻿#region
 
 using System.Linq;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -19,7 +20,7 @@ namespace wServer.logic.behaviors
         public SpawnGroup(string group, int maxChildren = 5, double initialSpawn = 0.5,
             Cooldown coolDown = new Cooldown())
         {
-            children = BehaviorDb.InitGameData.ObjectDescs.Values
+            children = BehaviorDb.InitGameDataService.ObjectDescs.Values
                 .Where(x => x.Group == group)
                 .Select(x => x.ObjectType).ToArray();
             this.maxChildren = maxChildren;

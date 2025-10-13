@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using Mono.Game;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
 

@@ -3,7 +3,11 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using log4net;
+using System.Threading.Tasks;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.logic;
 using wServer.networking;
 using wServer.networking.cliPackets;
@@ -29,8 +33,7 @@ namespace wServer.realm.entities.player
 
     public partial class Player : Character, IContainer, IPlayer
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof(Player));
-
+        private ILogger<Player> log;
         private bool dying;
 
         private Item[] inventory;
@@ -38,7 +41,7 @@ namespace wServer.realm.entities.player
         private float hpRegenCounter;
         private float mpRegenCounter;
         private bool resurrecting;
-
+        public int PlayerSkin { get; set; }
         private byte[,] tiles;
         private int pingSerial;
         private SetTypeSkin setTypeSkin;
@@ -46,6 +49,8 @@ namespace wServer.realm.entities.player
         public Player(RealmManager manager, Client psr)
             : base(manager, (ushort)psr.Character.ObjectType, psr.Random)
         {
+            log = Program.Services.GetRequiredService<ILogger<Player>>();
+
             try
             {
                 Client = psr;
@@ -79,52 +84,81 @@ namespace wServer.realm.entities.player
                     psr.Account.Stats.ClassStates.SingleOrDefault(_ => Utils.FromString(_.ObjectType) == ObjectType);
                 FameGoal = GetFameGoal(state?.BestFame ?? 0);
                 Glowing = IsUserInLegends();
-                Guild = GuildManager.Add(this, psr.Account.Guild);
+
+                // TODO: Convert GuildEntity to Guild struct properly
+                Guild = psr.Account.Guild != null
+                    ? GuildManager.Add(this, new Guild
+                    {
+                        Id = psr.Account.Guild.Id,
+                        Name = psr.Account.Guild.Name,
+                        Rank = psr.Account.Guild.Rank,
+                        Fame = psr.Account.Guild.Fame
+                    })
+                    : GuildManager.GetDefaultGuild();
+
                 HP = psr.Character.HitPoints <= 0 ? psr.Character.MaxHitPoints : psr.Character.HitPoints;
                 Mp = psr.Character.MagicPoints;
                 ConditionEffects = 0;
                 OxygenBar = 100;
                 HasBackpack = psr.Character.HasBackpack == 1;
-                PlayerSkin = Client.Account.OwnedSkins.Contains(Client.Character.Skin) ? Client.Character.Skin : 0;
+                var ownedSkins = string.IsNullOrEmpty(Client.Account.OwnedSkins)
+                    ? new int[0]
+                    : Client.Account.OwnedSkins.Split(',').Select(s => int.TryParse(s.Trim(), out var v) ? v : -1)
+                        .ToArray();
+                PlayerSkin = ownedSkins.Contains(Client.Character.Skin) ? Client.Character.Skin : 0;
                 HealthPotions = psr.Character.HealthStackCount < 0 ? 0 : psr.Character.HealthStackCount;
                 MagicPotions = psr.Character.MagicStackCount < 0 ? 0 : psr.Character.MagicStackCount;
 
-                Locked = psr.Account.Locked ?? new List<string>();
-                Ignored = psr.Account.Ignored ?? new List<string>();
+                // Convert comma-separated strings to Lists
+                Locked = string.IsNullOrEmpty(psr.Account.Locked)
+                    ? new List<string>()
+                    : psr.Account.Locked.Split(',').ToList();
+                Ignored = string.IsNullOrEmpty(psr.Account.Ignored)
+                    ? new List<string>()
+                    : psr.Account.Ignored.Split(',').ToList();
                 try
                 {
-                    Manager.Database.DoActionAsync(db =>
-                    {
-                        Locked = db.GetLockeds(AccountId);
-                        Ignored = db.GetIgnoreds(AccountId);
-                        Muted = db.IsMuted(AccountId);
-                        DailyQuest = psr.Account.DailyQuest;
-                    });
+                    // TODO: Migrate to repository pattern
+                    // Manager.Database.DoActionAsync(db =>
+                    // {
+                    //     Locked = db.GetLockeds(AccountId);
+                    //     Ignored = db.GetIgnoreds(AccountId);
+                    //     Muted = db.IsMuted(AccountId);
+                    //     DailyQuest = psr.Account.DailyQuest;
+                    // });
+
+                    // Temporary defaults until migration complete
+                    Locked = new List<string>();
+                    Ignored = new List<string>();
+                    Muted = false;
+                    DailyQuest = new QuestItem();
                 }
                 catch (Exception ex)
                 {
-                    log.Error(ex);
+                    log.LogError(ex, "Error loading locked/ignored lists or mute status from database");
                 }
 
                 if (HasBackpack)
                 {
                     var inv =
-                        psr.Character.Equipment.Select(
-                            _ =>
+                        psr.Character.Equipment.Select(_ =>
                                 _ == -1
                                     ? null
-                                    : (Manager.GameData.Items.ContainsKey((ushort)_) ? Manager.GameData.Items[(ushort)_] : null))
+                                    : (Manager.GameDataService.Items.ContainsKey((ushort)_)
+                                        ? Manager.GameDataService.Items[(ushort)_]
+                                        : null))
                             .ToArray();
                     var backpack =
-                        psr.Character.Backpack.Select(
-                            _ =>
+                        psr.Character.Backpack.Select(_ =>
                                 _ == -1
                                     ? null
-                                    : (Manager.GameData.Items.ContainsKey((ushort)_) ? Manager.GameData.Items[(ushort)_] : null))
+                                    : (Manager.GameDataService.Items.ContainsKey((ushort)_)
+                                        ? Manager.GameDataService.Items[(ushort)_]
+                                        : null))
                             .ToArray();
 
                     Inventory = inv.Concat(backpack).ToArray();
-                    var xElement = Manager.GameData.ObjectTypeToElement[ObjectType].Element("SlotTypes");
+                    var xElement = Manager.GameDataService.ObjectTypeToElement[ObjectType].Element("SlotTypes");
                     if (xElement != null)
                     {
                         var slotTypes =
@@ -137,18 +171,20 @@ namespace wServer.realm.entities.player
                 else
                 {
                     Inventory =
-                        psr.Character.Equipment.Select(
-                            _ =>
-                                _ == -1
+                        psr.Character.Equipment.Select(itemId =>
+                                itemId == -1
                                     ? null
-                                    : (Manager.GameData.Items.ContainsKey((ushort)_) ? Manager.GameData.Items[(ushort)_] : null))
+                                    : (Manager.GameDataService.GetItem((ushort)itemId) != null
+                                        ? Manager.GameDataService.Items[(ushort)itemId]
+                                        : null))
                             .ToArray();
-                    var xElement = Manager.GameData.ObjectTypeToElement[ObjectType].Element("SlotTypes");
+                    var xElement = Manager.GameDataService.ObjectTypeToElement[ObjectType].Element("SlotTypes");
                     if (xElement != null)
                         SlotTypes =
                             Utils.FromCommaSepString32(
                                 xElement.Value);
                 }
+
                 Stats = new[]
                 {
                     psr.Character.MaxHitPoints,
@@ -164,7 +200,8 @@ namespace wServer.realm.entities.player
                 Pet = null;
 
                 for (var i = 0; i < SlotTypes.Length; i++)
-                    if (SlotTypes[i] == 0) SlotTypes[i] = 10;
+                    if (SlotTypes[i] == 0)
+                        SlotTypes[i] = 10;
 
                 if (Client.Account.Rank >= 3) return;
                 for (var i = 0; i < 4; i++)
@@ -173,7 +210,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log.LogError(e, "Error in Player constructor");
             }
         }
 
@@ -225,6 +262,7 @@ namespace wServer.realm.entities.player
             get { return LootDropBoostTimeLeft > 0; }
             set { LootDropBoostTimeLeft = value ? LootDropBoostTimeLeft : 0.0f; }
         }
+
         public float LootDropBoostTimeLeft { get; set; }
 
         public bool LootTierBoost
@@ -232,6 +270,7 @@ namespace wServer.realm.entities.player
             get { return LootTierBoostTimeLeft > 0; }
             set { LootTierBoostTimeLeft = value ? LootTierBoostTimeLeft : 0.0f; }
         }
+
         public float LootTierBoostTimeLeft { get; set; }
 
         public bool XpBoosted { get; set; }
@@ -258,8 +297,6 @@ namespace wServer.realm.entities.player
         public int OxygenBar { get; set; }
 
         public Pet Pet { get; set; }
-
-        public int PlayerSkin { get; set; }
 
         public int Stars { get; set; }
 
@@ -310,7 +347,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception e)
             {
-                log.Error("Error while processing playerDamage: ", e);
+                log.LogError(e, "Error while processing playerDamage: ");
             }
         }
 
@@ -329,8 +366,11 @@ namespace wServer.realm.entities.player
             stats[StatsType.FameGoal] = FameGoal;
             stats[StatsType.Stars] = Stars;
 
-            stats[StatsType.Guild] = Guild[AccountId].Name;
-            stats[StatsType.GuildRank] = Guild[AccountId].Rank;
+            if (Guild.Count > 0 && Guild.Contains(AccountId))
+            {
+                stats[StatsType.Guild] = Guild[AccountId].Name;
+                stats[StatsType.GuildRank] = Guild[AccountId].Rank;
+            }
 
             stats[StatsType.Credits] = Credits;
             stats[StatsType.Tokens] = Tokens;
@@ -410,7 +450,8 @@ namespace wServer.realm.entities.player
             CheckSetTypeSkin();
             if (Boost == null) Boost = new int[12];
             else
-                for (var i = 0; i < Boost.Length; i++) Boost[i] = 0;
+                for (var i = 0; i < Boost.Length; i++)
+                    Boost[i] = 0;
             for (var i = 0; i < 4; i++)
             {
                 if (Inventory.Length < i || Inventory.Length == 0) return;
@@ -473,6 +514,7 @@ namespace wServer.realm.entities.player
                 Client.Disconnect();
                 return;
             }
+
             GenerateGravestone();
             if (desc != null)
                 killer = desc.DisplayId;
@@ -488,20 +530,26 @@ namespace wServer.realm.entities.player
                         BubbleTime = 0,
                         Stars = -1,
                         Name = "",
-                        Text = "{\"key\":\"server.death\",\"tokens\":{\"player\":\"" + Name + "\",\"level\":\"" + Level + "\",\"enemy\":\"" + killer + "\"}}"
+                        Text = "{\"key\":\"server.death\",\"tokens\":{\"player\":\"" + Name + "\",\"level\":\"" +
+                               Level + "\",\"enemy\":\"" + killer + "\"}}"
                     }, null);
                     break;
             }
 
             try
             {
-                Manager.Database.DoActionAsync(db =>
-                {
-                    Client.Character.Dead = true;
-                    SaveToCharacter();
-                    db.SaveCharacter(Client.Account, Client.Character);
-                    db.Death(Manager.GameData, Client.Account, Client.Character, killer);
-                });
+                // TODO: Migrate death handling to repository pattern
+                // Manager.Database.DoActionAsync(db =>
+                // {
+                //     Client.Character.Dead = true;
+                //     SaveToCharacter();
+                //     db.SaveCharacter(Client.Account, Client.Character);
+                //     db.Death(Manager.GameData, Client.Account, Client.Character, killer);
+                // });
+
+                // Temporary minimal death handling
+                Client.Character.Dead = true;
+                SaveToCharacter();
                 if (Owner.Id != -6)
                 {
                     Client.SendPacket(new DeathPacket
@@ -516,23 +564,25 @@ namespace wServer.realm.entities.player
                     Owner.LeaveWorld(this);
                 }
                 else
+                {
                     Client.Disconnect();
+                }
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log.LogError(e, "Error while processing playerDeath");
             }
         }
 
         public void GivePet(PetItem petInfo)
-        {
-            //if (Name == "ossimc82" || Name == "C453")
-            //{
+            {
+                //if (Name == "ossimc82" || Name == "C453")
+                //{
                 Pet = new Pet(Manager, petInfo, this);
                 Pet.Move(X, Y);
                 Owner.EnterWorld(Pet);
-            //}
-        }
+                //}
+            }
 
         public override bool HitByProjectile(Projectile projectile, RealmTime time)
         {
@@ -555,6 +605,7 @@ namespace wServer.realm.entities.player
                 x = rand.Next(0, owner.Map.Width);
                 y = rand.Next(0, owner.Map.Height);
             } while (owner.Map[x, y].Region != TileRegion.Spawn);
+
             Move(x + 0.5f, y + 0.5f);
             tiles = new byte[owner.Map.Width, owner.Map.Height];
             SetNewbiePeriod();
@@ -568,40 +619,46 @@ namespace wServer.realm.entities.player
                 Client.SendPacket(new Global_NotificationPacket
                 {
                     Type = 0,
-                    Text = Client.Account.Gifts.Count > 0 ? "giftChestOccupied" : "giftChestEmpty"
+                    Text = Client.Account.Gifts.Any() ? "giftChestOccupied" : "giftChestEmpty"
                 });
             }
 
             SendAccountList(Locked, AccountListPacket.LOCKED_LIST_ID);
             SendAccountList(Ignored, AccountListPacket.IGNORED_LIST_ID);
 
-            WorldTimer[] accTimer = {null};
+            WorldTimer[] accTimer = { null };
             owner.Timers.Add(accTimer[0] = new WorldTimer(5000, (w, t) =>
             {
-                Manager.Database.DoActionAsync(db =>
-                {
-                    if (Client?.Account == null) return;
-                    Client.Account = db.GetAccount(AccountId, Manager.GameData);
-                    Credits = Client.Account.Credits;
-                    CurrentFame = Client.Account.Stats.Fame;
-                    Tokens = Client.Account.FortuneTokens;
-                    accTimer[0].Reset();
-                    Manager.Logic.AddPendingAction(_ => w.Timers.Add(accTimer[0]), PendingPriority.Creation);
-                });
+                // TODO: Migrate account refresh to repository pattern
+                // Manager.Database.DoActionAsync(db =>
+                // {
+                //     if (Client?.Account == null) return;
+                //     Client.Account = db.GetAccount(AccountId, Manager.GameData);
+                //     Credits = Client.Account.Credits;
+                //     UpdateCount++;
+                //     CurrentFame = Client.Account.Stats.Fame;
+                //     Tokens = Client.Account.FortuneTokens;
+                // });
+
+                // Temporary minimal update
+                accTimer[0].Reset();
+                Manager.Logic.AddPendingAction(_ => w.Timers.Add(accTimer[0]), PendingPriority.Creation);
             }));
 
-            WorldTimer[] pingTimer = {null};
+            WorldTimer[] pingTimer = { null };
             owner.Timers.Add(pingTimer[0] = new WorldTimer(PING_PERIOD, (w, t) =>
             {
                 Client.SendPacket(new PingPacket { Serial = pingSerial++ });
                 pingTimer[0].Reset();
                 Manager.Logic.AddPendingAction(_ => w.Timers.Add(pingTimer[0]), PendingPriority.Creation);
             }));
-            Manager.Database.DoActionAsync(db =>
-            {
-                db.UpdateLastSeen(Client.Account.AccountId, Client.Character.CharacterId, owner.Name);
-                db.LockAccount(Client.Account);
-            });
+
+            // TODO: Migrate to repository pattern
+            // Manager.Database.DoActionAsync(db =>
+            // {
+            //     db.UpdateLastSeen(Client.Account.AccountId, Client.Character.CharacterId, owner.Name);
+            //     db.LockAccount(Client.Account);
+            // });
 
             if (Client.Account.IsGuestAccount)
             {
@@ -624,6 +681,7 @@ namespace wServer.realm.entities.player
                 owner.Timers.Add(new WorldTimer(1000, (w, t) => Client.Disconnect()));
                 return;
             }
+
             CheckSetTypeSkin();
         }
 
@@ -652,6 +710,7 @@ namespace wServer.realm.entities.player
                     chr.Backpack = backpack;
                     break;
             }
+
             chr.MaxHitPoints = Stats[0];
             chr.MaxMagicPoints = Stats[1];
             chr.Attack = Stats[2];
@@ -681,30 +740,36 @@ namespace wServer.realm.entities.player
                     SendError("Player.teleportCoolDown");
                     return;
                 }
+
                 if (obj.HasConditionEffect(ConditionEffectIndex.Invisible))
                 {
                     SendError("server.no_teleport_to_invisible");
                     return;
                 }
+
                 if (obj.HasConditionEffect(ConditionEffectIndex.Paused))
                 {
                     SendError("server.no_teleport_to_paused");
                     return;
                 }
+
                 var player = obj as Player;
                 if (player != null && !player.NameChosen)
                 {
                     SendError("server.teleport_needs_name");
                     return;
                 }
+
                 if (obj.Id == Id)
                 {
                     SendError("server.teleport_to_self");
                     return;
                 }
+
                 if (!Owner.AllowTeleport)
                 {
-                    SendError(GetLanguageString("server.no_teleport_in_realm", new KeyValuePair<string, object>("realm", Owner.Name)));
+                    SendError(GetLanguageString("server.no_teleport_in_realm",
+                        new KeyValuePair<string, object>("realm", Owner.Name)));
                     return;
                 }
 
@@ -717,10 +782,11 @@ namespace wServer.realm.entities.player
             }
             catch (Exception ex)
             {
-                log.Error(ex);
+                log.LogError(ex, "Error while processing playerTeleport");
                 SendError("player.cannotTeleportTo");
                 return;
             }
+
             Owner.BroadcastPacket(new GotoPacket
             {
                 ObjectId = Id,
@@ -756,6 +822,7 @@ namespace wServer.realm.entities.player
                     Manager.Database.DoActionAsync(db => db.UnlockAccount(Client.Account));
                     return;
                 }
+
                 if (Client.Stage == ProtocalStage.Disconnected || (!Client.Account.VerifiedEmail && Program.Verify))
                 {
                     if (Owner != null)
@@ -768,7 +835,7 @@ namespace wServer.realm.entities.player
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log?.LogError(e, "Error during Tick");
             }
 
             if (Stats != null && Boost != null)
@@ -797,14 +864,14 @@ namespace wServer.realm.entities.player
             if (Mp < 0) Mp = 0;
 
             /* try
-                * {
-                *     psr.Database.SaveCharacter(psr.Account, psr.Character);
-                *     UpdateCount++;
-                * }
-                * catch (ex)
-                * {
-                * }
-            */
+             * {
+             *     psr.Database.SaveCharacter(psr.Account, psr.Character);
+             *     UpdateCount++;
+             * }
+             * catch (ex)
+             * {
+             * }
+             */
 
             try
             {
@@ -813,22 +880,23 @@ namespace wServer.realm.entities.player
                     SendUpdate(time);
                     if (!Owner.IsPassable((int)X, (int)Y) && Client.Account.Rank < 2)
                     {
-                        log.Fatal($"Player {Name} No-Cliped at position: {X}, {Y}");
+                        log?.LogCritical($"Player {Name} No-Cliped at position: {X}, {Y}");
                         Client.Disconnect();
                     }
                 }
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log?.LogError(e, "Error during Tick update");
             }
+
             try
             {
                 SendNewTick(time);
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log?.LogError(e, "Error during sending new tick");
             }
 
             if (HP < 0 && !dying)
@@ -860,7 +928,7 @@ namespace wServer.realm.entities.player
                 Client.Reconnect(new ReconnectPacket
                 {
                     Host = "",
-                    Port = Program.Settings.GetValue<int>("port"),
+                    Port = Program.Config.Realm.ServerPort,
                     GameId = World.NEXUS_ID,
                     Name = "Nexus",
                     Key = Empty<byte>.Array,
@@ -869,12 +937,19 @@ namespace wServer.realm.entities.player
                 resurrecting = true;
                 return true;
             }
+
             return false;
         }
 
         private void GenerateGravestone()
         {
-            var maxed = (from i in Manager.GameData.ObjectTypeToElement[ObjectType].Elements("LevelIncrease") let xElement = Manager.GameData.ObjectTypeToElement[ObjectType].Element(i.Value) where xElement != null let limit = int.Parse(xElement.Attribute("max").Value) let idx = StatsManager.StatsNameToIndex(i.Value) where Stats[idx] >= limit select limit).Count();
+            var maxed = (from i in Manager.GameDataService.ObjectTypeToElement[ObjectType].Elements("LevelIncrease")
+                let xElement = Manager.GameDataService.ObjectTypeToElement[ObjectType].Element(i.Value)
+                where xElement != null
+                let limit = int.Parse(xElement.Attribute("max").Value)
+                let idx = StatsManager.StatsNameToIndex(i.Value)
+                where Stats[idx] >= limit
+                select limit).Count();
 
             ushort objType;
             int? time;
@@ -936,8 +1011,10 @@ namespace wServer.realm.entities.player
                         objType = 0x0725;
                         time = 5 * 60 * 1000;
                     }
+
                     break;
             }
+
             var obj = new StaticObject(Manager, objType, time, true, time != null, false);
             obj.Move(X, Y);
             obj.Name = Name;

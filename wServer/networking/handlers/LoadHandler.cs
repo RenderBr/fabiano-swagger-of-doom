@@ -1,6 +1,10 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using db;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -13,49 +17,39 @@ namespace wServer.networking.handlers
 {
     internal class LoadHandler : PacketHandlerBase<LoadPacket>
     {
-        public override PacketID ID
-        {
-            get { return PacketID.LOAD; }
-        }
+        public override PacketID ID => PacketID.LOAD;
 
-        protected override void HandlePacket(Client client, LoadPacket packet)
+        protected override async Task HandlePacket(Client client, LoadPacket packet)
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var characterRepository = scope.ServiceProvider.GetRequiredService<ICharacterRepository>();
+
+            var character = await characterRepository.GetByCharacterIdAsync(long.Parse(client.Account.AccountId), packet.CharacterId);
+            if (character == null || character.Dead)
             {
-                client.Character = db.LoadCharacter(client.Account, packet.CharacterId);
-                if (client.Character != null)
+                Program.Logger.LogError("Character not found or dead. AccountId: {AccountAccountId}, CharacterId: {PacketCharacterId}", client.Account.AccountId, packet.CharacterId);
+                client.SendPacket(new FailurePacket
                 {
-                    if (client.Character.Dead)
-                    {
-                        client.SendPacket(new FailurePacket
-                        {
-                            ErrorId = 0,
-                            ErrorDescription = "Character is dead."
-                        });
-                    }
-                    else
-                    {
-                        World target = client.Manager.Worlds[client.TargetWorld];
-                        client.SendPacket(new Create_SuccessPacket
-                        {
-                            CharacterID = client.Character.CharacterId,
-                            ObjectID =
-                                client.Manager.Worlds[client.TargetWorld].EnterWorld(
-                                    client.Player = new Player(client.Manager, client))
-                        });
-                        client.Stage = ProtocalStage.Ready;
-                    }
-                }
-                else
-                {
-                    client.SendPacket(new FailurePacket
-                    {
-                        ErrorId = 0,
-                        ErrorDescription = "Failed to Load character."
-                    });
-                    client.Disconnect();
-                }
+                    ErrorDescription = "Character not found or dead."
+                });
+                client.Disconnect();
+                return;
             }
+            
+            client.Character = Char.FromCharacter(character);
+            var world = client.Manager.Worlds[client.TargetWorld];
+
+            client.Player = new Player(client.Manager, client);
+            var objId = world.EnterWorld(client.Player);
+
+            client.SendPacket(new Create_SuccessPacket()
+            {
+                CharacterID = client.Character.CharacterId,
+                ObjectID = objId
+            });
+
+            client.Stage = ProtocalStage.Ready;
         }
     }
+
 }

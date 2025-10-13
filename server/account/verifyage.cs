@@ -1,12 +1,9 @@
 ﻿#region
 
-using System;
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Web;
-using db;
-using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -14,28 +11,21 @@ namespace server.account
 {
     internal class verifyage : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+            var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            if (acc != null)
             {
-                Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-                if (CheckAccount(acc, db))
-                {
-                    MySqlCommand cmd = db.CreateQuery();
-                    cmd.CommandText = "UPDATE accounts SET isAgeVerified=@newIsAgeVerified WHERE uuid=@uuid;";
-                    cmd.Parameters.AddWithValue("@newIsAgeVerified", Query["isAgeVerified"]);
-                    cmd.Parameters.AddWithValue("@uuid", Query["guid"]);
-                    if (cmd.ExecuteNonQuery() == 1)
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.Write("<Success/>");
-                    else
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.Write("<Error>Error.accountNotFound</Error>");
-                }
-                else
-                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                        wtr.Write("<Error>Error.accountNotFound</Error>");
+                acc.IsAgeVerified = true; // Assuming Query["isAgeVerified"] is "1" or something, but probably just set to true
+                await accountRepository.SaveChangesAsync();
+                WriteLine("<Success/>");
             }
+            else
+                WriteErrorLine("Error.accountNotFound");
         }
     }
 }

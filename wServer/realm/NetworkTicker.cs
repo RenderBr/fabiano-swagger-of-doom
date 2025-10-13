@@ -3,84 +3,86 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
-using log4net;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using wServer.networking;
 
 #endregion
 
 namespace wServer.realm
 {
-    #region
-
     using Work = Tuple<Client, Packet>;
 
-    #endregion
-
-    public class NetworkTicker //Sync network processing
+    public class NetworkTicker
     {
-        private static readonly ConcurrentQueue<Work> pendings = new ConcurrentQueue<Work>();
-        private static SpinWait loopLock = new SpinWait();
-        private readonly ILog log = LogManager.GetLogger(typeof (NetworkTicker));
+        private static readonly ConcurrentQueue<Work> _pending = new();
+        private static readonly SpinWait _loopLock = new();
+        private readonly ILogger<NetworkTicker> _logger;
+
+        public RealmManager Manager { get; }
 
         public NetworkTicker(RealmManager manager)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<NetworkTicker>>();
             Manager = manager;
         }
 
-        public RealmManager Manager { get; private set; }
-
-        public void AddPendingPacket(Client parrent, Packet pkt)
+        public void AddPendingPacket(Client parent, Packet pkt)
         {
-            pendings.Enqueue(new Work(parrent, pkt));
+            _pending.Enqueue(new Work(parent, pkt));
         }
 
-
-        public void TickLoop()
+        public async Task TickLoop(CancellationToken cancellationToken)
         {
-            log.Info("Network loop started.");
-            Work work;
-            while (true)
+            _logger?.LogInformation("Network loop started.");
+
+            try
             {
-                try
+                while (!cancellationToken.IsCancellationRequested)
                 {
-                    if (Manager.Terminating) break;
-                    loopLock.Reset();
-                    while (pendings.TryDequeue(out work))
+                    _loopLock.Reset();
+
+                    while (_pending.TryDequeue(out var work))
                     {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        var client = work.Item1;
+                        var packet = work.Item2;
+
                         try
                         {
-                            if (Manager.Terminating) return;
-                            if (work.Item1.Stage == ProtocalStage.Disconnected)
+                            if (client.Stage == ProtocalStage.Disconnected)
                             {
-                                Client client;
-                                var accId = work.Item1?.Account?.AccountId;
-                                if(accId != null)
-                                Manager.Clients.TryRemove(accId, out client);
+                                if (client.Account?.AccountId is string accId)
+                                    Manager.Clients.TryRemove(accId, out _);
                                 continue;
                             }
-                            try
-                            {
-                                work.Item1.ProcessPacket(work.Item2);
-                            }
-                            catch (Exception ex)
-                            {
-                                log.Error(ex);
-                            }
+
+                            await client.ProcessPacket(packet).ConfigureAwait(false);
                         }
                         catch (Exception ex)
                         {
-                            log.Error(ex);
+                            _logger?.LogError(ex, "Error processing packet for {ClientName}", client?.Account?.Name ?? "unknown");
                         }
                     }
-                    while (pendings.Count == 0 && !Manager.Terminating)
-                        loopLock.SpinOnce();
-                }
-                catch (Exception ex)
-                {
-                    log.Error(ex);
+
+                    // Sleep only when no pending packets
+                    if (_pending.IsEmpty && !cancellationToken.IsCancellationRequested)
+                        await Task.Delay(1, cancellationToken).ConfigureAwait(false);
                 }
             }
-            log.Info("Network loop stopped.");
+            catch (OperationCanceledException)
+            {
+                // graceful stop
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in Network loop");
+            }
+
+            _logger?.LogInformation("Network loop stopped.");
         }
     }
 }

@@ -6,7 +6,8 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using db.data;
-using log4net;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using wServer.logic.loot;
 using wServer.realm;
 using wServer.realm.entities;
@@ -18,7 +19,7 @@ namespace wServer.logic
     public partial class BehaviorDb
     {
         private static wRandom rand = new wRandom();
-        private static readonly ILog log = LogManager.GetLogger(typeof (BehaviorDb));
+        private static readonly ILogger log = Program.Services?.GetRequiredService<ILogger<BehaviorDb>>();
 
         private static int initializing;
         internal static BehaviorDb InitDb;
@@ -40,7 +41,7 @@ namespace wServer.logic
 
         public BehaviorDb(RealmManager manager)
         {
-            log.Info("Initializing Behavior Database...");
+            log?.LogInformation("Initializing Behavior Database...");
 
             Manager = manager;
 
@@ -48,7 +49,7 @@ namespace wServer.logic
 
             if (Interlocked.Exchange(ref initializing, 1) == 1)
             {
-                log.Error("Attempted to initialize multiple BehaviorDb at the same time.");
+                log?.LogError("Attempted to initialize multiple BehaviorDb at the same time.");
                 throw new InvalidOperationException("Attempted to initialize multiple BehaviorDb at the same time.");
             }
             InitDb = this;
@@ -60,7 +61,8 @@ namespace wServer.logic
             for (int i = 0; i < fields.Length; i++)
             {
                 FieldInfo field = fields[i];
-                log.InfoFormat("Loading behavior for '{0}'({1}/{2})...", field.Name, i + 1, fields.Length);
+                log?.LogInformation("Loading behavior for '{fieldName}'({current}/{total})...", 
+                    field.Name, i + 1, fields.Length);
                 ((_) field.GetValue(this))();
                 field.SetValue(this, null);
             }
@@ -68,14 +70,14 @@ namespace wServer.logic
             InitDb = null;
             initializing = 0;
 
-            log.Info("Behavior Database initialized...");
+            log?.LogInformation("Behavior Database initialized...");
         }
 
         public RealmManager Manager { get; private set; }
 
-        internal static XmlData InitGameData
+        internal static XmlDataService InitGameDataService
         {
-            get { return InitDb.Manager.GameData; }
+            get { return InitDb.Manager.GameDataService; }
         }
 
         public Dictionary<ushort, Tuple<State, Loot>> Definitions { get; private set; }
@@ -101,7 +103,7 @@ namespace wServer.logic
                 var d = new Dictionary<string, State>();
                 rootState.Resolve(d);
                 rootState.ResolveChildren(d);
-                XmlData dat = InitDb.Manager.GameData;
+                XmlDataService dat = InitDb.Manager.GameDataService;
                 if (defs.Length > 0)
                 {
                     var loot = new Loot(defs);

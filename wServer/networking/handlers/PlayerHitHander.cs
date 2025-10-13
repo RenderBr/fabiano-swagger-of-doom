@@ -1,6 +1,9 @@
 ﻿#region
 
 using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 using wServer.realm.entities;
 
@@ -15,13 +18,15 @@ namespace wServer.networking.handlers
             get { return PacketID.PLAYERHIT; }
         }
 
-        protected override void HandlePacket(Client client, PlayerHitPacket packet)
+        protected override Task HandlePacket(Client client, PlayerHitPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => Handle(client, packet));
+            return Task.CompletedTask;
         }
 
         private void Handle(Client client, PlayerHitPacket packet)
         {
+            var log = Program.Services.GetRequiredService<ILogger<PlayerHitHander>>();
             try
             {
                 if (client.Player.Owner != null)
@@ -41,15 +46,17 @@ namespace wServer.networking.handlers
                             else
                                 client.Player.ApplyConditionEffect(effect);
                         }
+
                         client.Player.Damage(proj.Damage, proj.ProjectileOwner.Self);
                     }
                     else
-                        log.Error("Can't register playerhit." + packet.ObjectId + " - " + packet.BulletId);
+                        log.LogError("Can't register playerhit: {ObjectId} - {BulletId}", packet.ObjectId,
+                            packet.BulletId);
                 }
             }
             catch (Exception ex)
             {
-                log.ErrorFormat("Error in PlayerHit: {0}", ex);
+                log.LogError(ex, "Error in PlayerHit");
             }
         }
     }

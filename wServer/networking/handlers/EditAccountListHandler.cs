@@ -1,7 +1,10 @@
 ﻿#region
 
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using db;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -18,13 +21,13 @@ namespace wServer.networking.handlers
             get { return PacketID.EDITACCOUNTLIST; }
         }
 
-        protected override void HandlePacket(Client client, EditAccountListPacket packet)
+        protected override Task HandlePacket(Client client, EditAccountListPacket packet)
         {
             Player target;
-            if(client.Player.Owner == null) return;
+            if (client.Player.Owner == null) return Task.CompletedTask;
             client.Manager.Logic.AddPendingAction(t =>
             {
-                using (Database db = new Database())
+                 client.Manager.Database.DoActionAsync(async db =>
                 {
                     target = client.Player.Owner.GetEntity(packet.ObjectId) is Player ? client.Player.Owner.GetEntity(packet.ObjectId) as Player : null;
                     if (target == null) return;
@@ -38,24 +41,29 @@ namespace wServer.networking.handlers
                         case AccountListPacket.LOCKED_LIST_ID:
                             if (packet.Add)
                             {
-                                db.AddLock(client.Account.AccountId, target.AccountId);
+                                // TODO: implement via repository; append to CSV for now
+                                client.Account.Locked = string.Join(",", (client.Player.Locked ?? new List<string>()).Concat(new[] { target.AccountId }));
                                 client.Player.Locked.Add(target.AccountId);
                             }
                             else
                             {
-                                db.RemoveLock(client.Account.AccountId, target.AccountId);
+                                var list = client.Player.Locked ?? new List<string>();
+                                list.Remove(target.AccountId);
+                                client.Account.Locked = string.Join(",", list);
                                 client.Player.Locked.Remove(target.AccountId);
                             }
                             break;
                         case AccountListPacket.IGNORED_LIST_ID:
                             if (packet.Add)
                             {
-                                db.AddIgnore(client.Account.AccountId, target.AccountId);
+                                client.Account.Ignored = string.Join(",", (client.Player.Ignored ?? new List<string>()).Concat(new[] { target.AccountId }));
                                 client.Player.Ignored.Add(target.AccountId);
                             }
                             else
                             {
-                                db.RemoveIgnore(client.Account.AccountId, target.AccountId);
+                                var ilist = client.Player.Ignored ?? new List<string>();
+                                ilist.Remove(target.AccountId);
+                                client.Account.Ignored = string.Join(",", ilist);
                                 client.Player.Ignored.Remove(target.AccountId);
                             }
                             break;
@@ -95,8 +103,9 @@ namespace wServer.networking.handlers
                     //}
 
                     //client.Player.SendAccountList(list, packet.AccountListId);
-                }
+                         });
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
     }
 }

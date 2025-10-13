@@ -1,6 +1,7 @@
 ﻿#region
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 
 #endregion
 
@@ -8,7 +9,7 @@ namespace server.credits
 {
     internal class add : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
             string status = "Nope, fuck you faggot :D";
             //using (Database db = new Database())
@@ -49,6 +50,7 @@ namespace server.credits
     </body>
 </html>");
             Context.Response.OutputStream.Write(res, 0, res.Length);
+            await Task.CompletedTask;
         }
     }
 }

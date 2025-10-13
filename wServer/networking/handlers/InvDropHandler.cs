@@ -1,6 +1,10 @@
 ﻿#region
 
 using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -21,9 +25,9 @@ namespace wServer.networking.handlers
             get { return PacketID.INVDROP; }
         }
 
-        protected override void HandlePacket(Client client, InvDropPacket packet)
+        protected override Task HandlePacket(Client client, InvDropPacket packet)
         {
-            if (client.Player.Owner == null) return;
+            if (client.Player.Owner == null) return Task.CompletedTask;
 
             if (client.Player.Owner is PetYard)
             {
@@ -45,12 +49,12 @@ namespace wServer.networking.handlers
                 if (packet.SlotObject.SlotId == 254)
                 {
                     client.Player.HealthPotions--;
-                    item = client.Player.Manager.GameData.Items[0xa22];
+                    item = client.Player.Manager.GameDataService.Items[0xa22];
                 }
                 else if (packet.SlotObject.SlotId == 255)
                 {
                     client.Player.MagicPotions--;
-                    item = client.Player.Manager.GameData.Items[0xa23];
+                    item = client.Player.Manager.GameDataService.Items[0xa23];
                 }
                 else
                 {
@@ -59,6 +63,7 @@ namespace wServer.networking.handlers
                     item = con.Inventory[packet.SlotObject.SlotId];
                     con.Inventory[packet.SlotObject.SlotId] = null;
                 }
+
                 entity.UpdateCount++;
 
                 if (item != null)
@@ -66,17 +71,18 @@ namespace wServer.networking.handlers
                     Container container;
                     if (item.Soulbound)
                     {
-                        container = new Container(client.Player.Manager, SOUL_BAG, 1000*30, true)
+                        container = new Container(client.Player.Manager, SOUL_BAG, 1000 * 30, true)
                         {
                             BagOwners = new string[1] { client.Player.AccountId }
                         };
                     }
                     else
                     {
-                        container = new Container(client.Player.Manager, NORM_BAG, 1000*30, true);
+                        container = new Container(client.Player.Manager, NORM_BAG, 1000 * 30, true);
                     }
-                    float bagx = entity.X + (float) ((invRand.NextDouble()*2 - 1)*0.5);
-                    float bagy = entity.Y + (float) ((invRand.NextDouble()*2 - 1)*0.5);
+
+                    float bagx = entity.X + (float)((invRand.NextDouble() * 2 - 1) * 0.5);
+                    float bagy = entity.Y + (float)((invRand.NextDouble() * 2 - 1) * 0.5);
                     try
                     {
                         container.Inventory[0] = item;
@@ -100,11 +106,12 @@ namespace wServer.networking.handlers
                     }
                     catch (Exception ex)
                     {
-                        log.Error(ex);
-                        log.InfoFormat(client.Player.Name + " just attempted to dupe.");
+                        var logger = Program.Services.GetRequiredService<ILogger<InvDropHandler>>();
+                        logger.LogError(ex, "{PlayerName} just attempted to dupe.", client.Player.Name);
                     }
                 }
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
     }
 }

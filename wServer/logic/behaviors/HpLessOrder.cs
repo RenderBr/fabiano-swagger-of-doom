@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -20,7 +21,7 @@ namespace wServer.logic.behaviors
         {
             this.dist = (float)dist;
             this.threshold = (float)threshold;
-            this.children = BehaviorDb.InitGameData.IdToObjectType[children];
+            this.children = BehaviorDb.InitGameDataService.IdToObjectType[children];
             this.targetStateName = targetStateName;
         }
 

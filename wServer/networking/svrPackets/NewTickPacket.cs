@@ -4,11 +4,13 @@
     {
         public int TickId { get; set; }
         public int TickTime { get; set; }
+        public uint ServerRealTimeMS { get; set; }
+        public ushort ServerLastRTTMS { get; set; }
         public ObjectStats[] UpdateStatuses { get; set; }
 
         public override PacketID ID
         {
-            get { return PacketID.NEW_TICK; }
+            get { return PacketID.NEWTICK; }
         }
 
         public override Packet CreateInstance()
@@ -20,6 +22,8 @@
         {
             TickId = rdr.ReadInt32();
             TickTime = rdr.ReadInt32();
+            ServerRealTimeMS = rdr.ReadUInt32();
+            ServerLastRTTMS = rdr.ReadUInt16();
 
             UpdateStatuses = new ObjectStats[rdr.ReadInt16()];
             for (int i = 0; i < UpdateStatuses.Length; i++)
@@ -30,8 +34,10 @@
         {
             wtr.Write(TickId);
             wtr.Write(TickTime);
+            wtr.Write(ServerRealTimeMS);
+            wtr.Write(ServerLastRTTMS);
 
-            wtr.Write((ushort) UpdateStatuses.Length);
+            wtr.Write((ushort)UpdateStatuses.Length);
             foreach (ObjectStats i in UpdateStatuses)
                 i.Write(psr, wtr);
         }

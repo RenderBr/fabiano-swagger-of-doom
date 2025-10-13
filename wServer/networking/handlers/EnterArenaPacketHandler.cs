@@ -1,5 +1,6 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using db;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
@@ -17,18 +18,20 @@ namespace wServer.networking.handlers
             get { return PacketID.ENTER_ARENA; }
         }
 
-        protected override void HandlePacket(Client client, EnterArenaPacket packet)
+        protected override Task HandlePacket(Client client, EnterArenaPacket packet)
         {
-            using (Database db = new Database())
+              client.Manager.Database.DoActionAsync(async db =>
             {
                 if (packet.Currency == 1)
                 {
-                    client.Player.CurrentFame = client.Account.Stats.Fame = db.UpdateFame(client.Account, -500);
+                    await db.UpdateFameAsync(client.Account, -500);
+                    client.Player.CurrentFame = client.Account.Stats.Fame;
                     client.Player.UpdateCount++;
                 }
                 else
                 {
-                    client.Player.Credits = client.Account.Credits = db.UpdateCredit(client.Account, -50);
+                        db.UpdateCredit(client.Account, -50);
+                        client.Player.Credits = client.Account.Credits;
                     client.SendPacket(new BuyResultPacket
                     {
                         Result = 0,
@@ -36,7 +39,7 @@ namespace wServer.networking.handlers
                     });
                     client.Player.UpdateCount++;
                 }
-            }
+                });
             client.Save();
 
             World world = client.Player.Manager.AddWorld(new Arena());
@@ -44,11 +47,13 @@ namespace wServer.networking.handlers
             client.Reconnect(new ReconnectPacket
             {
                 Host = "",
-                Port = Program.Settings.GetValue<int>("port"),
+                Port = Program.Config.Realm.ServerPort,
                 GameId = world.Id,
                 Name = world.Name,
                 Key = Empty<byte>.Array,
             });
+            
+            return Task.CompletedTask;
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -21,7 +22,7 @@ namespace wServer.logic.behaviors
 
         public TransformAndOrderOnDeath(string target, double range, string targetState, int min = 1, int max = 1, double probability = 1, bool returnToSpawn = false)
         {
-            this.target = BehaviorDb.InitGameData.IdToObjectType[target];
+            this.target = BehaviorDb.InitGameDataService.IdToObjectType[target];
             this.min = min;
             this.max = max;
             this.probability = (float) probability;

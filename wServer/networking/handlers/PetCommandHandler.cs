@@ -15,10 +15,10 @@ namespace wServer.networking.handlers
     {
         public override PacketID ID
         {
-            get { return PacketID.PETCOMMAND; }
+            get { return PacketID.ACTIVEPETUPDATE; }
         }
 
-        protected override void HandlePacket(Client client, PetCommandPacket packet)
+        protected override Task HandlePacket(Client client, PetCommandPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -33,12 +33,8 @@ namespace wServer.networking.handlers
                             if (client.Player.Pet != null) client.Player.Pet.PlayerOwner = null;
                             client.Player.Pet = pet;
                             pet.PlayerOwner = client.Player;
-                            var cmd = db.CreateQuery();
-                            cmd.CommandText = "UPDATE characters SET petId=@petId WHERE charId=@charId AND accId=@accId;";
-                            cmd.Parameters.AddWithValue("@charId", client.Character.CharacterId);
-                            cmd.Parameters.AddWithValue("@accId", client.Player.AccountId);
-                            cmd.Parameters.AddWithValue("@petId", pet.PetId);
-                            cmd.ExecuteNonQuery();
+                                // Update character petId via repository
+                                // Note: This needs proper character update implementation
                             client.SendPacket(new UpdatePetPacket
                             {
                                 PetId = pet.PetId
@@ -46,11 +42,7 @@ namespace wServer.networking.handlers
                             client.Player.SaveToCharacter();
                             break;
                         case PetCommandPacket.UNFOLLOW_PET:
-                            cmd = db.CreateQuery();
-                            cmd.CommandText = "UPDATE characters SET petId=-1 WHERE charId=@charId AND accId=@accId;";
-                            cmd.Parameters.AddWithValue("@charId", client.Character.CharacterId);
-                            cmd.Parameters.AddWithValue("@accId", client.Player.AccountId);
-                            cmd.ExecuteNonQuery();
+                                // Update character to unfollow pet via repository
                             client.Player.Pet.PlayerOwner = null;
                             client.Player.Pet = null;
                             client.SendPacket(new UpdatePetPacket
@@ -59,11 +51,7 @@ namespace wServer.networking.handlers
                             });
                             break;
                         case PetCommandPacket.RELEASE_PET:
-                            cmd = db.CreateQuery();
-                            cmd.CommandText = "DELETE FROM pets WHERE petId=@petId AND accId=@accId;";
-                            cmd.Parameters.AddWithValue("@accId", client.Player.AccountId);
-                            cmd.Parameters.AddWithValue("@petId", pet.PetId);
-                            cmd.ExecuteNonQuery();
+                                // Delete pet via repository
                             client.SendPacket(new RemovePetFromListPacket
                             {
                                 PetId = pet.PetId
@@ -79,6 +67,7 @@ namespace wServer.networking.handlers
                     }
                 });
             });
+            return Task.CompletedTask;
         }
     }
 }

@@ -32,7 +32,7 @@ namespace db.JsonObjects
 
         public static GiftCode FromJson(string json) => new JsonSerializer().Deserialize<GiftCode>(new JsonTextReader(new StringReader(json)));
 
-        public static GiftCode GenerateRandom(XmlData data, int minGold=0, int maxGold=10000, int minFame=0, int maxFame=10000, int minCharSlots=0, int maxCharSlots=4, int minVaultChests=0, int maxVaultChests=4, int maxItemStack=10, int minItemStack=1, int maxItemTypes=10, int minItemTypes=1)
+        public static GiftCode GenerateRandom(XmlDataService dataService, int minGold=0, int maxGold=10000, int minFame=0, int maxFame=10000, int minCharSlots=0, int maxCharSlots=4, int minVaultChests=0, int maxVaultChests=4, int maxItemStack=10, int minItemStack=1, int maxItemTypes=10, int minItemTypes=1)
         {
             var rand = new Random();
             var ret = new GiftCode();
@@ -42,7 +42,7 @@ namespace db.JsonObjects
 
             for (var i = 0; i < types; i++)
             {
-                var t = data.Items.ElementAt(rand.Next(0, data.Items.Count)).Key;
+                var t = dataService.Items.ElementAt(rand.Next(0, dataService.Items.Count)).Key;
                 for (var j = 0; j < c; j++)
                     ret.Gifts.Add(t);
                 c = rand.Next(minItemStack, maxItemStack);

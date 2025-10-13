@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.networking.svrPackets;
@@ -15,16 +16,17 @@ namespace wServer.networking.handlers
     {
         public override PacketID ID { get { return PacketID.CREATEGUILD; } }
 
-        protected override void HandlePacket(Client client, CreateGuildPacket packet)
+        protected override Task HandlePacket(Client client, CreateGuildPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => Handle(client, packet));
+            return Task.CompletedTask;
         }
 
         void Handle(Client client, CreateGuildPacket packet)
         {
             try
             {
-                client.Manager.Database.DoActionAsync(db =>
+                client.Manager.Database.DoActionAsync(async db =>
                 {
                     Player player = client.Player;
                     var name = packet.Name.ToString();
@@ -32,7 +34,7 @@ namespace wServer.networking.handlers
                     {
                         if (name != "")
                         {
-                            if (db.GetGuild(name) != null)
+                            if (await db.GetGuild(name).ConfigureAwait(false) != null)
                             {
                                 player.Client.SendPacket(new CreateGuildResultPacket()
                                 {
@@ -47,16 +49,17 @@ namespace wServer.networking.handlers
                                 {
                                     if (packet.Name != "")
                                     {
-                                        var g = db.CreateGuild(player.Client.Account, packet.Name);
-                                        player.Client.Account.Guild.Name = g.Name;
-                                        player.Client.Account.Guild.Rank = g.Rank;
-                                        player.Guild = GuildManager.Add(player, g);
+                                        var g = await db.CreateGuild(packet.Name, player.Client.Account).ConfigureAwait(false);
+                                        var legacyGuild = new Guild { Id = g.Id, Name = g.Name, Rank = 0, Fame = g.Fame };
+                                        player.Client.Account.GuildId = g.Id;
+                                        player.Client.Account.GuildRank = 0;
+                                        player.Guild = GuildManager.Add(player, legacyGuild);
                                         player.Client.SendPacket(new CreateGuildResultPacket()
                                         {
                                             Success = true,
                                             ErrorText = "{\"key\":\"server.buy_success\"}"
                                         });
-                                        player.CurrentFame = player.Client.Account.Stats.Fame = db.UpdateFame(player.Client.Account, -1000);
+                                        player.CurrentFame = player.Client.Account.Stats.Fame;
                                         player.UpdateCount++;
                                         return;
                                     }

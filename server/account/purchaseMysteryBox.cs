@@ -3,10 +3,13 @@
 using System;
 using System.IO;
 using System.Linq;
-using db;
-using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
 using server.mysterybox;
 using System.Xml;
+using db.Models;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -18,109 +21,86 @@ namespace server.account
         //<Success><Awards>ITEM ID</Awards><Gold>GOLD LEFT</Gold></Success>
         private Random rand;
 
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
+            var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
             rand = Query["ignore"] != null ? new Random(int.Parse(Query["ignore"])) : new Random();
 
-            using (Database db = new Database())
+            var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            if (acc != null)
             {
-                Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-                if (CheckAccount(acc, db, false))
+                if (Query["boxId"] == null)
                 {
-                    if (Query["boxId"] == null)
-                    {
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.WriteLine("<Error>Box not found</Error>");
-                        return;
-                    }
-                    MysteryBox box = MysteryBox.GetBox(int.Parse(Query["boxId"]));
-                    if (box == null)
-                    {
-                        using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                            wtr.WriteLine("<Error>Box not found</Error>");
-                        return;
-                    }
-                    if (box.Sale != null && DateTime.UtcNow <= box.Sale.SaleEnd)
-                    {
-                        switch (box.Sale.Currency)
-                        {
-                            case 0:
-                                if (acc.Credits < box.Sale.Price)
-                                {
-                                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                                        wtr.WriteLine("<Error>Not Enough Gold</Error>");
-                                    return;
-                                }
-                                break;
-                            case 1:
-                                if (acc.Stats.Fame < box.Sale.Price)
-                                {
-                                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                                        wtr.WriteLine("<Error>Not Enough Fame</Error>");
-                                    return;
-                                }
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        switch (box.Price.Currency)
-                        {
-                            case 0:
-                                if (acc.Credits < box.Price.Amount)
-                                {
-                                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                                        wtr.WriteLine("<Error>Not Enough Gold</Error>");
-                                    return;
-                                }
-                                break;
-                            case 1:
-                                if (acc.Stats.Fame < box.Price.Amount)
-                                {
-                                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                                        wtr.WriteLine("<Error>Not Enough Fame</Error>");
-                                    return;
-                                }
-                                break;
-                        }
-                    }
-
-                    MysteryBoxResult res = new MysteryBoxResult
-                    {
-                        Awards = Utils.GetCommaSepString(GetAwards(box.Contents))
-                    };
-                    if (box.Sale != null && DateTime.UtcNow <= box.Sale.SaleEnd)
-                        res.GoldLeft = box.Sale.Currency == 0
-                            ? db.UpdateCredit(acc, -box.Sale.Price)
-                            : db.UpdateFame(acc, -box.Sale.Price);
-                    else
-                        res.GoldLeft = box.Price.Currency == 0
-                            ? db.UpdateCredit(acc, -box.Price.Amount)
-                            : db.UpdateFame(acc, -box.Price.Amount);
-
-                    if (box.Sale != null && DateTime.UtcNow <= box.Sale.SaleEnd)
-                        res.Currency = box.Sale.Currency;
-                    else
-                        res.Currency = box.Price.Currency;
-
-                    sendMysteryBoxResult(Context.Response.OutputStream, res);
-
-                    int[] gifts = Utils.FromCommaSepString32(res.Awards);
-                    foreach (int item in gifts)
-                        acc.Gifts.Add(item);
-
-                    MySqlCommand cmd = db.CreateQuery();
-                    cmd.CommandText =
-                        "UPDATE accounts SET gifts=@gifts WHERE uuid=@uuid AND password=SHA1(@password);";
-                    cmd.Parameters.AddWithValue("@uuid", Query["guid"]);
-                    cmd.Parameters.AddWithValue("@password", Query["password"]);
-                    cmd.Parameters.AddWithValue("@gifts", Utils.GetCommaSepString(acc.Gifts.ToArray()));
-                    cmd.ExecuteNonQuery();
+                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                        wtr.WriteLine("<Error>Box not found</Error>");
+                    return;
+                }
+                server.mysterybox.MysteryBox box = server.mysterybox.MysteryBox.GetBox(int.Parse(Query["boxId"]));
+                if (box == null)
+                {
+                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                        wtr.WriteLine("<Error>Box not found</Error>");
+                    return;
+                }
+                int price = 0;
+                int currency = 0;
+                if (box.Sale != null && DateTime.UtcNow <= box.Sale.SaleEnd)
+                {
+                    price = box.Sale.Price;
+                    currency = box.Sale.Currency;
                 }
                 else
+                {
+                    price = box.Price.Amount;
+                    currency = box.Price.Currency;
+                }
+
+                if (currency == 0 && acc.Stats.Credits < price)
+                {
                     using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                        wtr.WriteLine("<Error>Account not found</Error>");
+                        wtr.WriteLine("<Error>Not Enough Gold</Error>");
+                    return;
+                }
+                if (currency == 1 && acc.Stats.Fame < price)
+                {
+                    using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                        wtr.WriteLine("<Error>Not Enough Fame</Error>");
+                    return;
+                }
+
+                MysteryBoxResult res = new MysteryBoxResult
+                {
+                    Awards = Utils.GetCommaSepString(GetAwards(box.Contents))
+                };
+
+                if (currency == 0)
+                {
+                    acc.Stats.Credits -= price;
+                    res.GoldLeft = acc.Stats.Credits;
+                }
+                else
+                {
+                    acc.Stats.Fame -= price;
+                    res.GoldLeft = acc.Stats.Fame;
+                }
+                res.Currency = currency;
+
+                sendMysteryBoxResult(Context.Response.OutputStream, res);
+
+                int[] gifts = Utils.FromCommaSepString32(res.Awards);
+                var giftList = Utils.FromCommaSepString32(acc.Gifts).ToList();
+                foreach (int item in gifts)
+                    giftList.Add(item);
+                acc.Gifts = Utils.GetCommaSepString(giftList.ToArray());
+
+                await accountRepository.SaveChangesAsync();
             }
+            else
+                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                    wtr.WriteLine("<Error>Account not found</Error>");
         }
 
         private int[] GetAwards(string items)

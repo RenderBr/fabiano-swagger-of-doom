@@ -67,7 +67,7 @@ namespace wServer.realm.setpieces
                 p = SetPieces.rotateCW(p);
             p[20, 20] = 2;
 
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
             for (int x = 0; x < Size; x++) //Rendering
                 for (int y = 0; y < Size; y++)
                 {

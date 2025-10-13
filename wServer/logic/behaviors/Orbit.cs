@@ -2,6 +2,7 @@
 
 using System;
 using Mono.Game;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion
@@ -24,7 +25,7 @@ namespace wServer.logic.behaviors
             this.speed = (float) speed;
             this.radius = (float) radius;
             this.acquireRange = (float) acquireRange;
-            this.target = target == null ? null : (ushort?) BehaviorDb.InitGameData.IdToObjectType[target];
+            this.target = target == null ? null : (ushort?) BehaviorDb.InitGameDataService.IdToObjectType[target];
             this.speedVariance = (float) (speedVariance ?? speed*0.1);
             this.radiusVariance = (float) (radiusVariance ?? speed*0.1);
         }

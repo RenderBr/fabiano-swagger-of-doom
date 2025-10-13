@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.networking.svrPackets;
@@ -15,9 +16,10 @@ namespace wServer.networking.handlers
     {
         public override PacketID ID { get { return PacketID.JOINGUILD; } }
 
-        protected override void HandlePacket(Client client, JoinGuildPacket packet)
+        protected override Task HandlePacket(Client client, JoinGuildPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => Handle(client, packet));
+            return Task.CompletedTask;
         }
 
         void Handle(Client client, JoinGuildPacket packet)
@@ -30,16 +32,16 @@ namespace wServer.networking.handlers
                 });
                 return;
             }
-            client.Manager.Database.DoActionAsync(db =>
+            client.Manager.Database.DoActionAsync(async db =>
             {
-                var gStruct = db.GetGuild(packet.GuildName);
+                var gStruct = await db.GetGuild(packet.GuildName).ConfigureAwait(false);
                 if (client.Player.Invited == false)
                 {
                     client.Player.SendInfo("You need to be invited to join a guild!");
                 }
                 if (gStruct != null)
                 {
-                    var g = db.ChangeGuild(client.Account, gStruct.Id, 0, 0, false);
+                    var g = await db.ChangeGuildAsync(client.Account, gStruct.Id, 0, 0, false).ConfigureAwait(false);
                     if (g != null)
                     {
                         client.Account.Guild = g;

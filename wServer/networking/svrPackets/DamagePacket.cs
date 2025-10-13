@@ -12,6 +12,7 @@ namespace wServer.networking.svrPackets
         public ConditionEffects Effects { get; set; }
         public ushort Damage { get; set; }
         public bool Killed { get; set; }
+        public bool ArmorPierce { get; set; }
         public byte BulletId { get; set; }
         public int ObjectId { get; set; }
 
@@ -49,6 +50,7 @@ namespace wServer.networking.svrPackets
             foreach (byte i in eff) wtr.Write(i);
             wtr.Write(Damage);
             wtr.Write(Killed);
+            wtr.Write(ArmorPierce);
             wtr.Write(BulletId);
             wtr.Write(ObjectId);
         }

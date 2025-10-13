@@ -10,7 +10,7 @@ namespace wServer.networking.cliPackets
     {
         public override PacketID ID
         {
-            get { return PacketID.VIEWQUESTS; }
+            get { return PacketID.QUEST_FETCH_ASK; }
         }
 
         public override Packet CreateInstance()

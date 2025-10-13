@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.IO;
+using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
 using wServer.realm.terrain;
 

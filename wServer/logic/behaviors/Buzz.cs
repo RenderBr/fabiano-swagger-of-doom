@@ -1,6 +1,7 @@
 ﻿#region
 
 using Mono.Game;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion

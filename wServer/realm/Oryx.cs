@@ -4,7 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using log4net;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -17,21 +18,20 @@ using wServer.networking;
 namespace wServer.realm
 {
     //The mad god who look after the realm
-    internal class Oryx : IDisposable
+    public class Oryx : IDisposable
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof(Oryx));
         private readonly int[] enemyCounts = new int[12];
         private readonly int[] enemyMaxCounts = new int[12];
 
         private readonly List<Tuple<string, ISetPiece>> events = new List<Tuple<string, ISetPiece>>
         {
-            Tuple.Create("Skull Shrine", (ISetPiece) new SkullShrine()),
-            Tuple.Create("Pentaract", (ISetPiece) new Pentaract()),
-            Tuple.Create("Grand Sphinx", (ISetPiece) new Sphinx()),
+            Tuple.Create("Skull Shrine", (ISetPiece)new SkullShrine()),
+            Tuple.Create("Pentaract", (ISetPiece)new Pentaract()),
+            Tuple.Create("Grand Sphinx", (ISetPiece)new Sphinx()),
             //"Lord of the Lost Lands",
             //"Hermit God",
             //"Ghost Ship",
-            Tuple.Create("Cube God", (ISetPiece) new CubeGod()),
+            Tuple.Create("Cube God", (ISetPiece)new CubeGod()),
         };
 
         private readonly Random rand = new Random();
@@ -174,21 +174,21 @@ namespace wServer.realm
                 },
                 {
                     WmapTerrain.Mountains, Tuple.Create(
-                    100, new []
-                    {
-                        Tuple.Create("White Demon", 0.1),
-                        Tuple.Create("Sprite God", 0.09),
-                        Tuple.Create("Medusa", 0.1),
-                        Tuple.Create("Ent God", 0.1),
-                        Tuple.Create("Beholder", 0.1),
-                        Tuple.Create("Flying Brain", 0.1),
-                        Tuple.Create("Slime God", 0.09),
-                        Tuple.Create("Ghost God", 0.09),
-                        Tuple.Create("Rock Bot", 0.05),
-                        Tuple.Create("Djinn", 0.09),
-                        Tuple.Create("Leviathan", 0.09),
-                        Tuple.Create("Arena Headless Horseman", 0.01)
-                    })
+                        100, new[]
+                        {
+                            Tuple.Create("White Demon", 0.1),
+                            Tuple.Create("Sprite God", 0.09),
+                            Tuple.Create("Medusa", 0.1),
+                            Tuple.Create("Ent God", 0.1),
+                            Tuple.Create("Beholder", 0.1),
+                            Tuple.Create("Flying Brain", 0.1),
+                            Tuple.Create("Slime God", 0.09),
+                            Tuple.Create("Ghost God", 0.09),
+                            Tuple.Create("Rock Bot", 0.05),
+                            Tuple.Create("Djinn", 0.09),
+                            Tuple.Create("Leviathan", 0.09),
+                            Tuple.Create("Arena Headless Horseman", 0.01)
+                        })
                 },
             };
 
@@ -221,11 +221,11 @@ namespace wServer.realm
         public bool CheckFinalQuests()
         {
             if (CountEnemies(
-                "Lich", "Actual Lich",
-                "Ent Ancient", "Actual Ent Ancient",
-                "Phoenix Reborn",
-                "Oasis Giant", "Ghost King", "Cyclops God", "Red Demon",
-                "Skull Shrine", "Cube God", "Grand Sphinx", "Hermit God") != 0) return false;
+                    "Lich", "Actual Lich",
+                    "Ent Ancient", "Actual Ent Ancient",
+                    "Phoenix Reborn",
+                    "Oasis Giant", "Ghost King", "Cyclops God", "Red Demon",
+                    "Skull Shrine", "Cube God", "Grand Sphinx", "Hermit God") != 0) return false;
             RealmClosed = true;
             return true;
         }
@@ -246,7 +246,7 @@ namespace wServer.realm
                     i.Client.SendPacket(new ReconnectPacket
                     {
                         Host = "",
-                        Port = Program.Settings.GetValue<int>("port"),
+                        Port = Program.Config.Realm.ServerPort,
                         GameId = ocWorld.Id,
                         Name = ocWorld.Name,
                         Key = ocWorld.PortalKey
@@ -263,6 +263,7 @@ namespace wServer.realm
                     EffectType = EffectType.Earthquake
                 });
             }
+
             world.Timers.Add(new WorldTimer(10000, (w, t) => w.Manager.RemoveWorld(w)));
         }
 
@@ -273,31 +274,32 @@ namespace wServer.realm
             {
                 try
                 {
-                    enemyList.Add(world.Manager.GameData.IdToObjectType[i]);
+                    enemyList.Add(world.Manager.GameDataService.IdToObjectType[i]);
                 }
                 catch (Exception ex)
                 {
-                    log.Error(ex);
+                    world.Logger.LogError(ex, "Error counting enemies in Oryx.CheckFinalQuests");
                 }
             }
+
             return world.Enemies.Count(i => enemyList.Contains(i.Value.ObjectType));
         }
 
         public void Init()
         {
-            log.InfoFormat("Oryx is controlling world {0}({1})...", world.Id, world.Name);
+            world.Logger.LogInformation("Oryx is controlling world {WorldId} ({WorldName})...", world.Id, world.Name);
             var w = world.Map.Width;
             var h = world.Map.Height;
             var stats = new int[12];
             for (var y = 0; y < h; y++)
-                for (var x = 0; x < w; x++)
-                {
-                    var tile = world.Map[x, y];
-                    if (tile.Terrain != WmapTerrain.None)
-                        stats[(int)tile.Terrain - 1]++;
-                }
+            for (var x = 0; x < w; x++)
+            {
+                var tile = world.Map[x, y];
+                if (tile.Terrain != WmapTerrain.None)
+                    stats[(int)tile.Terrain - 1]++;
+            }
 
-            log.Info("Spawning minions...");
+            world.Logger.LogInformation("Spawning minions...");
             foreach (var i in spawn)
             {
                 var terrain = i.Key;
@@ -310,25 +312,33 @@ namespace wServer.realm
                     var objType = GetRandomObjType(i.Value.Item2);
                     if (objType == 0) continue;
 
-                    enemyCounts[idx] += Spawn(world.Manager.GameData.ObjectDescs[objType], terrain, w, h);
+                    enemyCounts[idx] += Spawn(world.Manager.GameDataService.ObjectDescs[objType], terrain, w, h);
                     if (enemyCounts[idx] >= enemyCount) break;
                 }
             }
-            log.Info("Oryx is done.");
+
+            world.Logger.LogInformation("Oryx is done.");
         }
 
-        public void InitCloseRealm()
+        public async Task InitCloseRealm()
         {
-            log.InfoFormat("Oryx has closed realm {0}...", world.Name);
+            world.Logger.LogInformation("Oryx has closed realm {0}...", world.Name);
             ClosingStarted = true;
             foreach (var i in world.Players.Values)
             {
                 SendMsg(i, "I HAVE CLOSED THIS REALM!", "#Oryx the Mad God");
                 SendMsg(i, "YOU WILL NOT LIVE TO SEE THE LIGHT OF DAY!", "#Oryx the Mad God");
             }
+
             world.Timers.Add(new WorldTimer(120000, (ww, tt) => { CloseRealm(); }));
-            world.Manager.GetWorld(World.NEXUS_ID).Timers.Add(new WorldTimer(130000, (w, t) => Task.Factory.StartNew(() => GameWorld.AutoName(1, true)).ContinueWith(_ => w.Manager.AddWorld(_.Result), TaskScheduler.Default)));
-            world.Manager.CloseWorld(world);
+            world.Manager.GetWorld(World.NEXUS_ID).Timers.Add(
+                new WorldTimer(130000, async (w, t) =>
+                {
+                    var newWorld = await GameWorld.AutoNameAsync(world.Manager, 1, true);
+                    w.Manager.AddWorld(newWorld);
+                })
+            );
+            await world.Manager.CloseWorldAsync(world);
         }
 
         public void OnEnemyKilled(Enemy enemy, Player killer)
@@ -342,6 +352,7 @@ namespace wServer.realm
                         dat = i.Item2;
                         break;
                     }
+
                 if (dat == null) return;
 
                 if (dat.Value.killed != null)
@@ -358,7 +369,9 @@ namespace wServer.realm
                 {
                     var evt = events[rand.Next(0, events.Count)];
                     if (
-                        world.Manager.GameData.ObjectDescs[world.Manager.GameData.IdToObjectType[evt.Item1]].PerRealmMax ==
+                        world.Manager.GameDataService
+                            .ObjectDescs[world.Manager.GameDataService.IdToObjectType[evt.Item1]]
+                            .PerRealmMax ==
                         1)
                         events.Remove(evt);
                     SpawnEvent(evt.Item1, evt.Item2);
@@ -370,6 +383,7 @@ namespace wServer.realm
                             dat = i.Item2;
                             break;
                         }
+
                     if (dat == null) return;
 
                     if (dat.Value.spawn != null)
@@ -423,14 +437,14 @@ namespace wServer.realm
 
         private void EnsurePopulation()
         {
-            log.Info("Oryx is controlling population...");
+            world.Logger.LogInformation("Oryx is controlling population...");
             RecalculateEnemyCount();
             var state = new int[12];
             var diff = new int[12];
             var c = 0;
             for (var i = 0; i < state.Length; i++)
             {
-                if (enemyCounts[i] > enemyMaxCounts[i] * 1.5)  //Kill some
+                if (enemyCounts[i] > enemyMaxCounts[i] * 1.5) //Kill some
                 {
                     state[i] = 1;
                     diff[i] = enemyCounts[i] - enemyMaxCounts[i];
@@ -446,7 +460,8 @@ namespace wServer.realm
                     state[i] = 0;
                 }
             }
-            foreach (var i in world.Enemies)    //Kill
+
+            foreach (var i in world.Enemies) //Kill
             {
                 var idx = (int)i.Value.Terrain - 1;
                 if (idx == -1 || state[idx] == 0 ||
@@ -461,27 +476,29 @@ namespace wServer.realm
                     if (diff[idx] == 0)
                         c--;
                 }
+
                 if (c == 0) break;
             }
 
             int w = world.Map.Width, h = world.Map.Height;
-            for (var i = 0; i < state.Length; i++)  //Add
+            for (var i = 0; i < state.Length; i++) //Add
             {
                 if (state[i] != 2) continue;
                 var x = diff[i];
                 var t = (WmapTerrain)(i + 1);
-                for (var j = 0; j < x; )
+                for (var j = 0; j < x;)
                 {
                     var objType = GetRandomObjType(spawn[t].Item2);
                     if (objType == 0) continue;
 
-                    j += Spawn(world.Manager.GameData.ObjectDescs[objType], t, w, h);
+                    j += Spawn(world.Manager.GameDataService.ObjectDescs[objType], t, w, h);
                 }
             }
+
             RecalculateEnemyCount();
 
             GC.Collect();
-            log.Info("Oryx is back to sleep.");
+            world.Logger.LogInformation("Oryx is back to sleep.");
         }
 
         private ushort GetRandomObjType(Tuple<string, double>[] dat)
@@ -494,10 +511,11 @@ namespace wServer.realm
                 n += k.Item2;
                 if (n > p)
                 {
-                    objType = world.Manager.GameData.IdToObjectType[k.Item1];
+                    objType = world.Manager.GameDataService.IdToObjectType[k.Item1];
                     break;
                 }
             }
+
             return objType;
         }
 
@@ -602,6 +620,7 @@ namespace wServer.realm
                 world.EnterWorld(entity);
                 ret++;
             }
+
             return ret;
         }
 
@@ -620,7 +639,7 @@ namespace wServer.realm
             pt.X -= (setpiece.Size - 1) / 2;
             pt.Y -= (setpiece.Size - 1) / 2;
             setpiece.RenderSetPiece(world, pt);
-            log.InfoFormat("Oryx spawned {0} at ({1}, {2}).", name, pt.X, pt.Y);
+            world.Logger.LogInformation("Oryx spawned {Name} at ({X}, {Y}).", name, pt.X, pt.Y);
         }
 
         private struct TauntData

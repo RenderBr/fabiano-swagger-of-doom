@@ -5,7 +5,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using db;
-using MySql.Data.MySqlClient;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using MySqlConnector;
+using RageRealm.Shared.Models;
 using wServer.networking;
 using wServer.realm.entities;
 
@@ -63,19 +66,20 @@ namespace wServer.realm.worlds
             int w = Map.Width;
             int h = Map.Height;
             for (int y = 0; y < h; y++)
-                for (int x = 0; x < w; x++)
-                {
-                    WmapTile tile = Map[x, y];
-                    if (tile.Region == TileRegion.Spawn)
-                        spawn = new IntPoint(x, y);
-                    else if (tile.Region == TileRegion.Vault)
-                        vaultChestPosition.Add(new IntPoint(x, y));
-                    else if (tile.Region == TileRegion.Gifting_Chest)
-                        giftChestPosition.Add(new IntPoint(x, y));
-                }
+            for (int x = 0; x < w; x++)
+            {
+                WmapTile tile = Map[x, y];
+                if (tile.Region == TileRegion.Spawn)
+                    spawn = new IntPoint(x, y);
+                else if (tile.Region == TileRegion.Vault)
+                    vaultChestPosition.Add(new IntPoint(x, y));
+                else if (tile.Region == TileRegion.Gifting_Chest)
+                    giftChestPosition.Add(new IntPoint(x, y));
+            }
+
             vaultChestPosition.Sort((x, y) => Comparer<int>.Default.Compare(
-                (x.X - spawn.X)*(x.X - spawn.X) + (x.Y - spawn.Y)*(x.Y - spawn.Y),
-                (y.X - spawn.X)*(y.X - spawn.X) + (y.Y - spawn.Y)*(y.Y - spawn.Y)));
+                (x.X - spawn.X) * (x.X - spawn.X) + (x.Y - spawn.Y) * (x.Y - spawn.Y),
+                (y.X - spawn.X) * (y.X - spawn.X) + (y.Y - spawn.Y) * (y.Y - spawn.Y)));
 
             List<VaultChest> chests = psr.Account.Vault.Chests;
 
@@ -85,15 +89,17 @@ namespace wServer.realm.worlds
                 GiftChest c = new GiftChest();
                 c.Items = new List<Item>(8);
                 bool wasLastElse = false;
-                int[] gifts = psr.Account.Gifts.ToArray();
+                int[] gifts = string.IsNullOrEmpty(psr.Account.Gifts)
+                    ? new int[0]
+                    : psr.Account.Gifts.Split(',').Where(s => int.TryParse(s, out _)).Select(int.Parse).ToArray();
                 gifts.Shuffle();
                 for (int i = 0; i < gifts.Count(); i++)
                 {
-                    if (Manager.GameData.Items.ContainsKey((ushort)gifts[i]))
+                    if (Manager.GameDataService.Items.ContainsKey((ushort)gifts[i]))
                     {
                         if (c.Items.Count < 8)
                         {
-                            c.Items.Add(Manager.GameData.Items[(ushort)gifts[i]]);
+                            c.Items.Add(Manager.GameDataService.Items[(ushort)gifts[i]]);
                             wasLastElse = false;
                         }
                         else
@@ -101,11 +107,12 @@ namespace wServer.realm.worlds
                             giftChests.Add(c);
                             c = new GiftChest();
                             c.Items = new List<Item>(8);
-                            c.Items.Add(Manager.GameData.Items[(ushort)gifts[i]]);
+                            c.Items.Add(Manager.GameDataService.Items[(ushort)gifts[i]]);
                             wasLastElse = true;
                         }
                     }
                 }
+
                 if (!wasLastElse)
                     giftChests.Add(c);
 
@@ -129,12 +136,11 @@ namespace wServer.realm.worlds
                 if (vaultChestPosition.Count == 0) break;
                 Container con = new Container(Manager, 0x0504, null, false);
                 Item[] inv =
-                    t.Items.Select(
-                        _ =>
+                    t.Items.Select(_ =>
                             _ == -1
                                 ? null
-                                : (Manager.GameData.Items.ContainsKey((ushort) _)
-                                    ? Manager.GameData.Items[(ushort) _]
+                                : (Manager.GameDataService.Items.ContainsKey((ushort)_)
+                                    ? Manager.GameDataService.Items[(ushort)_]
                                     : null))
                         .ToArray();
                 for (int j = 0; j < 8; j++)
@@ -163,16 +169,13 @@ namespace wServer.realm.worlds
 
         private void Init(string accId)
         {
-            Manager.Database.DoActionAsync(db =>
+            Manager.Database.DoActionAsync(async db =>
             {
                 this.AccountId = accId;
 
-                MySqlCommand cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT name FROM accounts WHERE id=@accId";
-                cmd.Parameters.AddWithValue("@accId", accId);
-                using (MySqlDataReader rdr = cmd.ExecuteReader())
-                    while (rdr.Read())
-                        PlayerOwnerName = rdr.GetString("name");
+                var account = await db.GetAccount(int.Parse(accId));
+                if (account != null)
+                    PlayerOwnerName = account.Name;
 
                 List<IntPoint> vaultChestPosition = new List<IntPoint>();
                 IntPoint spawn = new IntPoint(0, 0);
@@ -180,45 +183,42 @@ namespace wServer.realm.worlds
                 int w = Map.Width;
                 int h = Map.Height;
                 for (int y = 0; y < h; y++)
-                    for (int x = 0; x < w; x++)
-                    {
-                        WmapTile tile = Map[x, y];
-                        if (tile.Region == TileRegion.Spawn)
-                            spawn = new IntPoint(x, y);
-                        else if (tile.Region == TileRegion.Vault)
-                            vaultChestPosition.Add(new IntPoint(x, y));
-                    }
+                for (int x = 0; x < w; x++)
+                {
+                    WmapTile tile = Map[x, y];
+                    if (tile.Region == TileRegion.Spawn)
+                        spawn = new IntPoint(x, y);
+                    else if (tile.Region == TileRegion.Vault)
+                        vaultChestPosition.Add(new IntPoint(x, y));
+                }
+
                 vaultChestPosition.Sort((x, y) => Comparer<int>.Default.Compare(
                     (x.X - spawn.X) * (x.X - spawn.X) + (x.Y - spawn.Y) * (x.Y - spawn.Y),
                     (y.X - spawn.X) * (y.X - spawn.X) + (y.Y - spawn.Y) * (y.Y - spawn.Y)));
 
                 List<VaultChest> chests = new List<VaultChest>();
 
-                cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT items, chestId FROM vaults WHERE accId=@accId";
-                cmd.Parameters.AddWithValue("@accId", accId);
-                using (MySqlDataReader rdr = cmd.ExecuteReader())
+                // Get vaults for this account via repository (placeholder implementation)
+                // Note: This needs proper VaultChest mapping from Vault entities
+                var vaultEntities = new List<db.Models.Vault>(); // Placeholder
+                foreach (var vault in vaultEntities)
                 {
-                    while (rdr.Read())
+                    chests.Add(new VaultChest
                     {
-                        chests.Add(new VaultChest
-                        {
-                            _Items = rdr.GetString("items"),
-                            ChestId = rdr.GetInt32("chestId")
-                        });
-                    }
+                        _Items = vault.Items,
+                        ChestId = vault.ChestId
+                    });
                 }
 
                 foreach (VaultChest t in chests)
                 {
                     Container con = new Container(Manager, 0x0504, null, false);
                     Item[] inv =
-                        t.Items.Select(
-                            _ =>
+                        t.Items.Select(_ =>
                                 _ == -1
                                     ? null
-                                    : (Manager.GameData.Items.ContainsKey((ushort)_)
-                                        ? Manager.GameData.Items[(ushort)_]
+                                    : (Manager.GameDataService.Items.ContainsKey((ushort)_)
+                                        ? Manager.GameDataService.Items[(ushort)_]
                                         : null))
                             .ToArray();
                     for (int j = 0; j < 8; j++)
@@ -229,6 +229,7 @@ namespace wServer.realm.worlds
 
                     _vaultChests[new Tuple<Container, VaultChest>(con, t)] = con.UpdateCount;
                 }
+
                 foreach (IntPoint i in vaultChestPosition)
                 {
                     SellableObject x = new SellableObject(Manager, 0x0505);
@@ -242,11 +243,12 @@ namespace wServer.realm.worlds
         {
             Container con = new Container(Manager, 0x0504, null, false);
             Item[] inv =
-                chest.Items.Select(
-                    _ =>
+                chest.Items.Select(_ =>
                         _ == -1
                             ? null
-                            : (Manager.GameData.Items.ContainsKey((ushort) _) ? Manager.GameData.Items[(ushort) _] : null))
+                            : (Manager.GameDataService.Items.ContainsKey((ushort)_)
+                                ? Manager.GameDataService.Items[(ushort)_]
+                                : null))
                     .ToArray();
             for (int j = 0; j < 8; j++)
                 con.Inventory[j] = inv[j];
@@ -283,7 +285,8 @@ namespace wServer.realm.worlds
                     }
                     catch (Exception ex)
                     {
-                        Log.Error(ex);
+                        Program.Services.GetRequiredService<ILogger<Vault>>().LogError(ex,
+                            "Error saving vault chest for {AccountId}", AccountId);
                     }
                 }
             }

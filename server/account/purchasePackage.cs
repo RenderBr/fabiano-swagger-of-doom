@@ -1,14 +1,13 @@
 ﻿#region
 
-using System;
 using System.Collections.Generic;
-using System.Collections.Specialized;
 using System.IO;
-using System.Net;
-using System.Web;
-using db;
-using MySql.Data.MySqlClient;
+using System.Linq;
+using System.Threading.Tasks;
 using server.package;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 
 #endregion
@@ -17,75 +16,58 @@ namespace server.account
 {
     public class purchasePackage : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            StreamWriter wtr = new StreamWriter(Context.Response.OutputStream);
             if (Query.AllKeys.Length > 0)
             {
-                using (Database db = new Database())
-                {
-                    Package package = Package.GetPackage(int.Parse(Query["packageId"]));
+                using var scope = Program.Services.CreateScope();
+                var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+                var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
 
-                    if (package == null)
+                Package package = Package.GetPackage(int.Parse(Query["packageId"]));
+
+                if (package == null)
+                {
+                    WriteErrorLine("This package is not available any more");
+                    return;
+                }
+
+                JsonSerializer s = new JsonSerializer();
+                var contents = s.Deserialize<PackageContent>(new JsonTextReader(new StringReader(package.Contents)));
+
+                var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+
+                if (await CheckAccount(acc))
+                {
+                    if (acc.Stats.Credits < package.Price)
                     {
-                        wtr.Write("<Error>This package is not available any more</Error>");
+                        WriteErrorLine("Not enough gold.");
                         return;
                     }
 
-                    JsonSerializer s = new JsonSerializer();
-                    var contents = s.Deserialize<PackageContent>(new JsonTextReader(new StringReader(package.Contents)));
-
-                    Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-
-                    if (CheckAccount(acc, db, false))
+                    if (contents.items?.Count > 0)
                     {
-                        if (acc.Credits < package.Price)
+                        var giftList = Utils.FromCommaSepString32(acc.Gifts).ToList();
+                        foreach (var i in contents.items)
                         {
-                            wtr.Write("<Error>Not enough gold.<Error/>");
-                            return;
+                            giftList.Add(i);
                         }
-
-                        var cmd = db.CreateQuery();
-
-                        if (contents.items?.Count > 0)
-                        {
-                            foreach (var i in contents.items)
-                            {
-                                Dictionary<string, int> itemDic = new Dictionary<string, int>();
-                                List<int> gifts = acc.Gifts;
-                                gifts.Add(i);
-
-                                cmd = db.CreateQuery();
-                                cmd.CommandText =
-                                    "UPDATE accounts SET gifts=@gifts WHERE uuid=@uuid AND password=SHA1(@password);";
-                                cmd.Parameters.AddWithValue("@gifts", Utils.GetCommaSepString<int>(gifts.ToArray()));
-                                cmd.Parameters.AddWithValue("@uuid", Query["guid"]);
-                                cmd.Parameters.AddWithValue("@password", Query["password"]);
-                                cmd.ExecuteNonQuery();
-                            }
-                        }
-
-                        if (contents.charSlots > 0)
-                        {
-                            cmd = db.CreateQuery();
-                            cmd.CommandText =
-                                "UPDATE accounts SET maxCharSlot=maxCharSlot + @amount WHERE uuid=@uuid AND password=SHA1(@password);";
-                            cmd.Parameters.AddWithValue("@amount", contents.charSlots);
-                            cmd.Parameters.AddWithValue("@uuid", Query["guid"]);
-                            cmd.Parameters.AddWithValue("@password", Query["password"]);
-                            if (cmd.ExecuteNonQuery() == 0)
-                                return;
-                        }
-
-                        if (contents.vaultChests > 0)
-                        {
-                            for (int j = 0; j < contents.vaultChests; j++)
-                                db.CreateChest(acc);
-                        }
-
-                        db.UpdateCredit(acc, -package.Price);
-                        wtr.Write("<Success/>");
+                                                acc.Gifts = Utils.GetCommaSepString<int>(giftList.ToArray());
                     }
+
+                    if (contents.charSlots > 0)
+                    {
+                        acc.MaxCharSlot = (byte)(acc.MaxCharSlot + contents.charSlots);
+                    }
+
+                    if (contents.vaultChests > 0)
+                    {
+                        // TODO: Create chests
+                    }
+
+                    acc.Stats.Credits -= package.Price;
+                    await accountRepository.SaveChangesAsync();
+                    WriteLine("<Success/>");
                 }
             }
         }

@@ -1,7 +1,11 @@
 ﻿#region
 
 using System;
-using log4net;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
+using wServer.Factories;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.setpieces;
@@ -10,72 +14,93 @@ using wServer.realm.setpieces;
 
 namespace wServer.realm.worlds
 {
-    internal class GameWorld : World
+    public class GameWorld : World
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof (GameWorld));
+        public ILogger<GameWorld> Logger;
 
-        private readonly int mapId;
-        private readonly bool oryxPresent;
-        private string displayname;
+        private readonly int _mapId;
+        private readonly bool _oryxPresent;
+        private string _displayName;
 
-        public GameWorld(int mapId, string name, bool oryxPresent)
+        public Oryx? Overseer { get; private set; }
+
+        public GameWorld(int mapId, string name, bool oryxPresent, ILogger<GameWorld> logger)
         {
-            displayname = name;
+            _displayName = name;
             Name = name;
             ClientWorldName = name;
             Background = 0;
             Difficulty = -1;
-            this.oryxPresent = oryxPresent;
-            this.mapId = mapId;
+            _oryxPresent = oryxPresent;
+            _mapId = mapId;
+            Logger = logger;
         }
 
-        public Oryx Overseer { get; private set; }
-
-        protected override void Init()
+        /// <summary>
+        /// Asynchronous world initialization.
+        /// </summary>
+        public async Task InitAsync()
         {
-            log.InfoFormat("Initializing Game World {0}({1}) from map {2}...", Id, Name, mapId);
-            LoadMap("wServer.realm.worlds.maps.world" + mapId + ".wmap", MapType.Wmap);
-            SetPieces.ApplySetPieces(this);
-            if (oryxPresent)
-                Overseer = new Oryx(this);
-            else
-                Overseer = null;
-            log.Info("Game World initalized.");
+            Logger.LogInformation("Initializing Game World {ID} ({Name}) from map {MapId}...", Id, Name, _mapId);
+
+            // just await directly — LoadMapAsync is already asynchronous
+            await LoadMapAsync($"wServer.realm.worlds.maps.world{_mapId}.wmap", MapType.Wmap)
+                .ConfigureAwait(false);
+
+            // only wrap CPU-heavy synchronous work (like setpiece placement)
+            await Task.Run(() => SetPieces.ApplySetPieces(this))
+                .ConfigureAwait(false);
+
+            Overseer = _oryxPresent ? new Oryx(this) : null;
+
+            Logger.LogInformation("Game World initialized.");
         }
 
-        public static GameWorld AutoName(int mapId, bool oryxPresent)
+
+        /// <summary>
+        /// Asynchronously creates a new GameWorld with an automatically selected name.
+        /// </summary>
+        public static async Task<GameWorld> AutoNameAsync(RealmManager manager, int mapId, bool oryxPresent)
         {
+            // Pick a random available realm name
             string name = RealmManager.Realms[new Random().Next(RealmManager.Realms.Count)];
+
+            // Track the name to prevent reuse
             RealmManager.Realms.Remove(name);
-            RealmManager.CurrentRealmNames.Add(name);
-            return new GameWorld(mapId, name, oryxPresent);
+            RealmManager.CurrentRealmNames.TryAdd(name, 0);
+
+            var gameWorldFactory = Program.Services.GetRequiredService<IGameWorldFactory>();
+            
+            // Create and initialize the world asynchronously
+            var world = gameWorldFactory.Create(mapId, name, oryxPresent);
+            world.Manager = manager;
+            
+            await world.InitAsync();
+            return world;
         }
 
         public override void Tick(RealmTime time)
         {
             base.Tick(time);
-            if (Overseer != null)
-                Overseer.Tick(time);
+            Overseer?.Tick(time);
         }
 
         public void EnemyKilled(Enemy enemy, Player killer)
         {
-            if (Overseer != null)
-                Overseer.OnEnemyKilled(enemy, killer);
+            Overseer?.OnEnemyKilled(enemy, killer);
         }
 
         public override int EnterWorld(Entity entity)
         {
             int ret = base.EnterWorld(entity);
-            if (entity is Player)
-                Overseer.OnPlayerEntered(entity as Player);
+            if (entity is Player p)
+                Overseer?.OnPlayerEntered(p);
             return ret;
         }
 
         public override void Dispose()
         {
-            if (Overseer != null)
-                Overseer.Dispose();
+            Overseer?.Dispose();
             base.Dispose();
         }
     }

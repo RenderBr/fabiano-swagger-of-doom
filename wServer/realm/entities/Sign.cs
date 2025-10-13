@@ -1,4 +1,6 @@
-﻿namespace wServer.realm.entities
+﻿using RageRealm.Shared.Models;
+
+namespace wServer.realm.entities
 {
     public class Sign : StaticObject
     {

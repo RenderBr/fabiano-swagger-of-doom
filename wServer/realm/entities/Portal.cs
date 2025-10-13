@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using RageRealm.Shared.Models;
 
 #endregion
 
@@ -14,8 +15,8 @@ namespace wServer.realm.entities
             : base(manager, objType, life, false, true, false)
         {
             Usable = objType != 0x0721;
-            ObjectDesc = Manager.GameData.Portals[objType];
-            Name = manager.GameData.Portals[objType].DisplayId;
+            ObjectDesc = Manager.GameDataService.Portals[objType];
+            Name = manager.GameDataService.Portals[objType].DisplayId;
         }
 
         private Portal(RealmManager manager, PortalDesc desc, int? life)
@@ -66,7 +67,7 @@ namespace wServer.realm.entities
 
         public Portal Unlock(string dungeonName)
         {
-            var desc = Manager.GameData.Portals[0x0700];
+            var desc = Manager.GameDataService.Portals[0x0700];
             desc.DungeonName = dungeonName;
             var portal = new Portal(Manager, desc, desc.TimeoutTime * 1000);
             portal.Move(X, Y);

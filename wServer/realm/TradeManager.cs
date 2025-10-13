@@ -1,9 +1,11 @@
-﻿using log4net;
+﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
@@ -12,7 +14,7 @@ namespace wServer.realm
 {
     public class TradeManager
     {
-        private readonly static ILog log = LogManager.GetLogger(typeof(TradeManager));
+        private readonly ILogger<TradeManager> _logger;
         public static List<KeyValuePair<Player, Player>> CurrentRequests { get; }
         public static List<Player> TradingPlayers { get; }
 
@@ -33,6 +35,7 @@ namespace wServer.realm
 
         public TradeManager(Player player1, Player player2)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<TradeManager>>();
             this.player1Trades = new bool[12];
             this.player2Trades = new bool[12];
             this.player1 = player1;
@@ -179,7 +182,7 @@ namespace wServer.realm
             }
             catch (Exception ex)
             {
-                log.Error(ex);
+                _logger?.LogError(ex, "Error during trade acceptance between {Player1} and {Player2}", player1?.Name, player2?.Name);
             }
         }
 

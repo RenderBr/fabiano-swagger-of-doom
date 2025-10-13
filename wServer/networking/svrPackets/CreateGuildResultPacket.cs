@@ -7,7 +7,7 @@
 
         public override PacketID ID
         {
-            get { return PacketID.CREATEGUILDRESULT; }
+            get { return PacketID.CREATEGUILD; }
         }
 
         public override Packet CreateInstance()

@@ -46,21 +46,21 @@ namespace wServer.realm.setpieces
             }
             t[20, 20] = 3;
 
-            XmlData data = world.Manager.GameData;
+            XmlDataService dataService = world.Manager.GameDataService;
             for (int x = 0; x < 40; x++)
                 for (int y = 0; y < 40; y++)
                 {
                     if (t[x, y] == 1)
                     {
                         WmapTile tile = world.Map[x + pos.X, y + pos.Y].Clone();
-                        tile.TileId = data.IdToTileType[Floor];
+                        tile.TileId = dataService.IdToTileType[Floor];
                         tile.ObjType = 0;
                         world.Map[x + pos.X, y + pos.Y] = tile;
                     }
                     else if (t[x, y] == 2)
                     {
                         WmapTile tile = world.Map[x + pos.X, y + pos.Y].Clone();
-                        tile.TileId = data.IdToTileType[Floor];
+                        tile.TileId = dataService.IdToTileType[Floor];
                         tile.ObjType = 0;
                         world.Map[x + pos.X, y + pos.Y] = tile;
 

@@ -36,7 +36,7 @@ namespace wServer.networking
         public void Read(Client client, byte[] body, int offset, int len)
         {
             Crypt(client, body, offset, len);
-            Read(client, new NReader(new MemoryStream(body)));
+            Read(client, new NReader(new MemoryStream(body, offset, len)));
         }
 
         public int Write(Client client, byte[] buff, int offset)
@@ -46,7 +46,8 @@ namespace wServer.networking
 
             int len = (int) s.Position;
             Crypt(client, buff, offset + 5, len);
-            Buffer.BlockCopy(BitConverter.GetBytes(IPAddress.HostToNetworkOrder(len + 5)), 0, buff, offset, 4);
+            int lenBE = IPAddress.HostToNetworkOrder(len+5);
+            Buffer.BlockCopy(BitConverter.GetBytes(lenBE), 0, buff, offset, 4);
             buff[offset + 4] = (byte) ID;
             return len + 5;
         }

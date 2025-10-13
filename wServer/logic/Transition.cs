@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion

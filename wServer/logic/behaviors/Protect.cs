@@ -1,6 +1,7 @@
 ﻿#region
 
 using Mono.Game;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion
@@ -20,7 +21,7 @@ namespace wServer.logic.behaviors
             double reprotectRange = 1)
         {
             this.speed = (float) speed;
-            this.protectee = BehaviorDb.InitGameData.IdToObjectType[protectee];
+            this.protectee = BehaviorDb.InitGameDataService.IdToObjectType[protectee];
             this.acquireRange = (float) acquireRange;
             this.protectionRange = (float) protectionRange;
             this.reprotectRange = (float) reprotectRange;

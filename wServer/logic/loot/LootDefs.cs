@@ -38,7 +38,7 @@ namespace wServer.logic.loot
         {
             Lootstate = lootState;
             if (playerDat != null) return;
-            XmlData dat = manager.GameData;
+            XmlDataService dat = manager.GameDataService;
             lootDefs.Add(new LootDef(dat.Items[dat.IdToObjectType[item]], probability, lootState));
         }
     }
@@ -97,7 +97,7 @@ namespace wServer.logic.loot
         {
             Lootstate = lootState;
             if (playerDat != null) return;
-            Item[] candidates = manager.GameData.Items
+            Item[] candidates = manager.GameDataService.Items
                 .Where(item => item.Value.SlotType == 26)
                 .Where(item => item.Value.Tier == (int)rarity)
                 .Select(item => item.Value)
@@ -152,7 +152,7 @@ namespace wServer.logic.loot
         {
             Lootstate = lootState;
             if (playerDat != null) return;
-            Item[] candidates = manager.GameData.Items
+            Item[] candidates = manager.GameDataService.Items
                 .Where(item => Array.IndexOf(types, item.Value.SlotType) != -1)
                 .Where(item => item.Value.Tier == tier)
                 .Select(item => item.Value)

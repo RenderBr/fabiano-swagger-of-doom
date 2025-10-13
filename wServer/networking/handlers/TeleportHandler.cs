@@ -1,5 +1,7 @@
 ﻿#region
 
+using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.realm;
 
@@ -14,12 +16,14 @@ namespace wServer.networking.handlers
             get { return PacketID.TELEPORT; }
         }
 
-        protected override void HandlePacket(Client client, TeleportPacket packet)
+        protected override Task HandlePacket(Client client, TeleportPacket packet)
         {
-            if (client.Player.Owner == null) return;
+            if (client.Player.Owner == null) return Task.CompletedTask;
 
             client.Manager.Logic.AddPendingAction(t => client.Player.Teleport(t, packet),
                 PendingPriority.Networking);
+            
+            return Task.CompletedTask;
         }
     }
 }

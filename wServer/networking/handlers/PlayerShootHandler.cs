@@ -1,6 +1,10 @@
 ﻿#region
 
 using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -18,13 +22,13 @@ namespace wServer.networking.handlers
             get { return PacketID.PLAYERSHOOT; }
         }
 
-        protected override void HandlePacket(Client client, PlayerShootPacket packet)
+        protected override Task HandlePacket(Client client, PlayerShootPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
                 if (client.Player.Owner == null) return;
 
-                Item item = client.Player.Manager.GameData.Items[(ushort)packet.ContainerType];
+                Item item = client.Player.Manager.GameDataService.Items[(ushort)packet.ContainerType];
                 int stype = 0;
 
                 for (int i = 0; i < 4; i++)
@@ -38,7 +42,7 @@ namespace wServer.networking.handlers
 
                 if (client.Player.SlotTypes[stype] != item.SlotType && client.Account.Rank < 2)
                 {
-                    log.FatalFormat("{0} is trying to cheat (Weapon doesnt match the slot type)", client.Player.Name);
+                    Program.Services.GetRequiredService<ILogger<PlayerShootPacketHandler>>().LogCritical("{PlayerName} is trying to cheat (Weapon doesnt match the slot type)", client.Player.Name);
                     client.Player.SendError("This cheating attempt has beed logged and a message was send to all online admins.");
                     client.Disconnect();
                     foreach (Player player in client.Player.Owner.Players.Values)
@@ -60,6 +64,7 @@ namespace wServer.networking.handlers
                 }, p => p != client.Player && client.Player.Dist(p) < 25);
                 client.Player.FameCounter.Shoot(prj);
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
     }
 }

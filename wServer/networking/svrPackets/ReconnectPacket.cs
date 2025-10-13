@@ -4,6 +4,7 @@
     {
         public string Name { get; set; }
         public string Host { get; set; }
+        public string StatusMessage { get; set; } = "Loading...";
         public int Port { get; set; }
         public int GameId { get; set; }
         public int KeyTime { get; set; }
@@ -24,6 +25,7 @@
         {
             Name = rdr.ReadUTF();
             Host = rdr.ReadUTF();
+            StatusMessage = rdr.ReadUTF();
             Port = rdr.ReadInt32();
             GameId = rdr.ReadInt32();
             KeyTime = rdr.ReadInt32();
@@ -36,6 +38,7 @@
         {
             wtr.WriteUTF(Name);
             wtr.WriteUTF(Host);
+            wtr.WriteUTF(StatusMessage);
             wtr.Write(Port);
             wtr.Write(GameId);
             wtr.Write(KeyTime);

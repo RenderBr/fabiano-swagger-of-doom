@@ -1,5 +1,7 @@
 ﻿#region
 
+using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.realm.entities;
@@ -15,7 +17,7 @@ namespace wServer.networking.handlers
             get { return PacketID.BUY; }
         }
 
-        protected override void HandlePacket(Client client, BuyPacket packet)
+        protected override Task HandlePacket(Client client, BuyPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -24,6 +26,8 @@ namespace wServer.networking.handlers
                 if (obj != null)
                     obj.Buy(client.Player);
             }, PendingPriority.Networking);
+            
+            return Task.CompletedTask;
         }
     }
 }

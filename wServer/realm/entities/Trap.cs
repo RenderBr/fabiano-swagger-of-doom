@@ -1,6 +1,7 @@
 ﻿#region
 
 //using wServer.logic;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
 

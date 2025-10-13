@@ -1,6 +1,7 @@
 ﻿#region
 
 using System.Xml.Linq;
+using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
 

@@ -31,7 +31,7 @@
         protected override void Write(Client psr, NWriter wtr)
         {
             wtr.Write(AccountListId);
-            wtr.Write((ushort) AccountIds.Length);
+            wtr.Write((short) AccountIds.Length);
             foreach (string i in AccountIds)
                 wtr.WriteUTF(i);
             wtr.Write(LockAction);

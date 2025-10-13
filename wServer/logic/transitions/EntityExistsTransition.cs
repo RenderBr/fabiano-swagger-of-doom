@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 namespace wServer.logic.transitions
@@ -18,7 +19,7 @@ namespace wServer.logic.transitions
             : base(targetState)
         {
             this.dist = dist;
-            this.target = BehaviorDb.InitGameData.IdToObjectType[target];
+            this.target = BehaviorDb.InitGameDataService.IdToObjectType[target];
         }
 
         protected override bool TickCore(Entity host, RealmTime time, ref object state)

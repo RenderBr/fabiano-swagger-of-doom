@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 

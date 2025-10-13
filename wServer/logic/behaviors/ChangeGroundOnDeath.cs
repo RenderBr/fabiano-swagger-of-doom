@@ -1,6 +1,7 @@
 ﻿#region
 
 using db.data;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion
@@ -30,7 +31,7 @@ namespace wServer.logic.behaviors
         {
             parent.Death += (sender, e) =>
             {
-                var dat = e.Host.Manager.GameData;
+                var dat = e.Host.Manager.GameDataService;
                 var w = e.Host.Owner;
                 var pos = new IntPoint((int) e.Host.X - (dist/2), (int) e.Host.Y - (dist/2));
                 if (w == null) return;

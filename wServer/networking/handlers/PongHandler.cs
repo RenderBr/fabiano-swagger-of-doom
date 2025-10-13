@@ -1,5 +1,6 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 
 #endregion
@@ -13,9 +14,10 @@ namespace wServer.networking.handlers
             get { return PacketID.PONG; }
         }
 
-        protected override void HandlePacket(Client client, PongPacket packet)
+        protected override Task HandlePacket(Client client, PongPacket packet)
         {
             client.Player.Pong(packet.Time, packet);
+            return Task.CompletedTask;
         }
     }
 }

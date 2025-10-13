@@ -85,7 +85,7 @@ namespace wServer.realm.setpieces
 
             t[13 + 6, 13] = 3;
 
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
             for (int x = 0; x < 27; x++) //Rendering
                 for (int y = 0; y < 27; y++)
                 {

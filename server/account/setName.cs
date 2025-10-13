@@ -1,13 +1,10 @@
-﻿#region
+#region
 
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Web;
-using db;
-using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -15,44 +12,35 @@ namespace server.account
 {
     internal class setName : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+            var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            if (await CheckAccount(acc))
             {
-                Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-                byte[] status = new byte[0];
-                if (CheckAccount(acc, db))
+                if (!acc.NameChosen)
                 {
-                    if (!acc.NameChosen)
+                    if (Regex.IsMatch(Query["name"], @"^[a-zA-Z]+$"))
                     {
-                        if (Regex.IsMatch(Query["name"], @"^[a-zA-Z]+$"))
-                        {
-                            MySqlCommand cmd = db.CreateQuery();
-                            object exescala;
-                            cmd.CommandText = "SELECT COUNT(name) FROM accounts WHERE name=@name;";
-                            cmd.Parameters.AddWithValue("@name", Query["name"]);
-                            exescala = cmd.ExecuteScalar();
-                            if (int.Parse(exescala.ToString()) > 0)
-                                status = Encoding.UTF8.GetBytes("<Error>Duplicated name</Error>");
-                            else
-                            {
-                                cmd = db.CreateQuery();
-                                cmd.CommandText = "UPDATE accounts SET name=@name, namechosen=TRUE WHERE id=@accId;";
-                                cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                                cmd.Parameters.AddWithValue("@name", Query["name"]);
-                                if (cmd.ExecuteNonQuery() != 0)
-                                    status = Encoding.UTF8.GetBytes("<Success />");
-                                else
-                                    status = Encoding.UTF8.GetBytes("<Error>Internal error</Error>");
-                            }
-                        }
+                        var existingName = await accountRepository.FirstOrDefaultAsync(a => a.Name == Query["name"]);
+                        if (existingName != null)
+                            WriteErrorLine("Duplicated name");
                         else
-                            status = Encoding.UTF8.GetBytes("<Error>Invalid name</Error>");
+                        {
+                            acc.Name = Query["name"];
+                            acc.NameChosen = true;
+                            await accountRepository.SaveChangesAsync();
+                            WriteLine("<Success />");
+                        }
                     }
                     else
-                        status = Encoding.UTF8.GetBytes("<Error>You have already a name</Error>");
+                        WriteErrorLine("Invalid name");
                 }
-                Context.Response.OutputStream.Write(status, 0, status.Length);
+                else
+                    WriteErrorLine("Name already chosen");
             }
         }
     }

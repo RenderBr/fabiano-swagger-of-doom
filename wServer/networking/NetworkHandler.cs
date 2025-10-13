@@ -1,309 +1,357 @@
 ﻿#region
 
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using log4net;
 using System.Text;
-using wServer.networking.svrPackets;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
 namespace wServer.networking
 {
-    //hackish code
     internal class NetworkHandler : IDisposable
     {
-        public const int BUFFER_SIZE = int.MaxValue / 4096;
-        private static readonly ILog log = LogManager.GetLogger(typeof (NetworkHandler));
+        private readonly ILogger<NetworkHandler> _logger;
+        private const int HEADER_SIZE = 5;
+        private const int BUFFER_SIZE = 8192;
+
         private readonly Client parent;
-        private readonly ConcurrentQueue<Packet> pendingPackets = new ConcurrentQueue<Packet>();
-        private readonly object sendLock = new object();
-        private readonly Socket skt;
+        private readonly Socket socket;
+        private readonly ConcurrentQueue<Packet> sendQueue = new();
+        private readonly SemaphoreSlim sendLock = new(1, 1);
+        private readonly CancellationTokenSource cts = new();
+        public bool _isRunning = true;
+        private bool _disposed;
 
-        private SocketAsyncEventArgs receive;
-        private byte[] receiveBuff;
-        private ReceiveState receiveState = ReceiveState.Awaiting;
-
-        private SocketAsyncEventArgs send;
-        private byte[] sendBuff;
-        private SendState sendState = SendState.Awaiting;
-
-        public NetworkHandler(Client parent, Socket skt)
+        public NetworkHandler(Client parent, Socket socket)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<NetworkHandler>>();
             this.parent = parent;
-            this.skt = skt;
+            this.socket = socket;
         }
 
         public void BeginHandling()
         {
-            skt.NoDelay = true;
-            skt.UseOnlyOverlappedIO = true;
-
-            send = new SocketAsyncEventArgs();
-            send.Completed += SendCompleted;
-            send.UserToken = new SendToken();
-            send.SetBuffer(sendBuff = new byte[BUFFER_SIZE], 0, BUFFER_SIZE);
-
-            receive = new SocketAsyncEventArgs();
-            receive.Completed += ReceiveCompleted;
-            receive.UserToken = new ReceiveToken();
-            receive.SetBuffer(receiveBuff = new byte[BUFFER_SIZE], 0, BUFFER_SIZE);
-
-            receiveState = ReceiveState.ReceivingHdr;
-            receive.SetBuffer(0, 5);
-            if (!skt.ReceiveAsync(receive))
-                ReceiveCompleted(this, receive);
+            socket.NoDelay = true;
+            _ = Task.Run(ReceiveLoop, cts.Token);
+            _ = Task.Run(SendLoop, cts.Token);
         }
 
-        private void ProcessPolicyFile() //WUT.
-        {
-            NetworkStream s = new NetworkStream(skt);
-            NWriter wtr = new NWriter(s);
-            wtr.WriteNullTerminatedString(@"<cross-domain-policy>
-     <allow-access-from domain=""*"" to-ports=""*"" />
-</cross-domain-policy>");
-            wtr.Write((byte) '\r');
-            wtr.Write((byte) '\n');
-            parent.Disconnect();
-        }
-
-        //It is said that ReceiveAsync/SendAsync never returns false unless error
-        //So...let's just treat it as always true
-
-        private void ReceiveCompleted(object sender, SocketAsyncEventArgs e)
+        public void Stop()
         {
             try
             {
-                if (!skt.Connected)
+                cts?.Cancel(); // cancel send/receive loops
+                socket?.Close();
+            }
+            catch
+            {
+            }
+
+            // prevent further sends
+            _isRunning = false;
+
+            sendQueue.Clear();
+        }
+
+        private async Task ReceiveLoop()
+        {
+            var buffer = ArrayPool<byte>.Shared.Rent(BUFFER_SIZE);
+            try
+            {
+                while (_isRunning && !cts.IsCancellationRequested && socket.Connected)
                 {
-                    parent.Disconnect();
-                    return;
-                }
-
-                if (e.SocketError != SocketError.Success)
-                    throw new SocketException((int) e.SocketError);
-
-                switch (receiveState)
-                {
-                    case ReceiveState.ReceivingHdr:
-                        if (e.BytesTransferred < 5)
-                        {
-                            parent.Disconnect();
-                            return;
-                        }
-
-                        if (e.Buffer[0] == 0x4d && e.Buffer[1] == 0x61 &&
-                            e.Buffer[2] == 0x64 && e.Buffer[3] == 0x65 && e.Buffer[4] == 0xff)
-                        {
-                            log.InfoFormat("Usage request from: @ {0}.", skt.RemoteEndPoint);
-                            byte[] c = Encoding.ASCII.GetBytes(parent.Manager.MaxClients +
-                                ":" + parent.Manager.Clients.Count.ToString());
-                            skt.Send(c);
-                            return;
-                        }
-
-                        if (e.Buffer[0] == 0x3c && e.Buffer[1] == 0x70 &&
-                            e.Buffer[2] == 0x6f && e.Buffer[3] == 0x6c && e.Buffer[4] == 0x69)
-                        {
-                            ProcessPolicyFile();
-                            return;
-                        }
-
-                        int len = (e.UserToken as ReceiveToken).Length =
-                            IPAddress.NetworkToHostOrder(BitConverter.ToInt32(e.Buffer, 0)) - 5;
-                        if (len < 0 || len > BUFFER_SIZE)
-                            throw new InternalBufferOverflowException();
-                        Packet packet = null;
-                        try
-                        {
-                            packet = Packet.Packets[(PacketID)e.Buffer[4]].CreateInstance();
-                        }
-                        catch
-                        {
-                            log.ErrorFormat("Packet ID not found: {0}", e.Buffer[4]);
-                        }
-                        (e.UserToken as ReceiveToken).Packet = packet;
-
-                        receiveState = ReceiveState.ReceivingBody;
-                        e.SetBuffer(0, len);
-                        skt.ReceiveAsync(e);
+                    // Receive header (4 length bytes + 1 packet id)
+                    int received = await ReceiveExactAsync(buffer.AsMemory(0, HEADER_SIZE)).ConfigureAwait(false);
+                    if (received < HEADER_SIZE)
+                    {
+                        _logger?.LogWarning("Client disconnected mid-header.");
                         break;
-                    case ReceiveState.ReceivingBody:
-                        if (e.BytesTransferred < (e.UserToken as ReceiveToken).Length)
-                        {
-                            parent.Disconnect();
-                            return;
-                        }
+                    }
 
-                        Packet pkt = (e.UserToken as ReceiveToken).Packet;
-                        pkt.Read(parent, e.Buffer, 0, (e.UserToken as ReceiveToken).Length);
-
-                        receiveState = ReceiveState.Processing;
-                        bool cont = OnPacketReceived(pkt);
-
-                        if (cont && skt.Connected)
-                        {
-                            receiveState = ReceiveState.ReceivingHdr;
-                            e.SetBuffer(0, 5);
-                            skt.ReceiveAsync(e);
-                        }
+                    // Policy or usage checks
+                    if (IsPolicyRequest(buffer))
+                    {
+                        await SendPolicyResponse().ConfigureAwait(false);
                         break;
-                    default:
-                        throw new InvalidOperationException(e.LastOperation.ToString());
+                    }
+
+                    if (IsUsageRequest(buffer))
+                    {
+                        await SendUsageResponse().ConfigureAwait(false);
+                        break;
+                    }
+
+                    var totalLen = IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buffer, 0));
+                    var packetId = buffer[4];
+
+                    int bodyLen = totalLen - HEADER_SIZE;
+                    _logger?.LogDebug("Header => totalLen={bodyLen}, packetId={packetId}, available={available}", 
+                        bodyLen, packetId, socket.Available);
+
+                    if (bodyLen is < 0 or > BUFFER_SIZE)
+                    {
+                        _logger?.LogError("Invalid packet length {bodyLen} from {endPoint}", 
+                            bodyLen, socket.RemoteEndPoint);
+                        break;
+                    }
+
+                    Packet packet = null;
+                    try
+                    {
+                        packet = Packet.Packets[(PacketID)packetId].CreateInstance();
+                    }
+                    catch
+                    {
+                        _logger?.LogError("Unknown packet ID {packetId:X2} from {endPoint}", 
+                            packetId, socket.RemoteEndPoint);
+                        continue;
+                    }
+
+                    // Read body
+                    received = await ReceiveExactAsync(buffer.AsMemory(HEADER_SIZE - 1, bodyLen)).ConfigureAwait(false);
+                    if (received < bodyLen)
+                    {
+                        _logger?.LogWarning("Client disconnected mid-body.");
+                        break;
+                    }
+
+                    try
+                    {
+                        packet.Read(parent, buffer, HEADER_SIZE - 1, bodyLen);
+
+                        if (packet.ID != PacketID.PING && packet.ID != PacketID.PONG && packet.ID != PacketID.UPDATE &&
+                            packet.ID != PacketID.MOVE)
+                        {
+                            _logger?.LogInformation("Received {packetId} ({packetType}) [{bodyLen} bytes] from {endPoint}",
+                                packetId, packet.GetType().Name, bodyLen, socket.RemoteEndPoint);
+                        }
+
+                        if (parent.IsReady())
+                            parent.Manager.Network.AddPendingPacket(parent, packet);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error reading packet {packetId:X2} from {endPoint}", 
+                            packetId, socket.RemoteEndPoint);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                OnError(ex);
+                _logger?.LogError(ex, "Receive loop failed");
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
             }
         }
 
-        private void SendCompleted(object sender, SocketAsyncEventArgs e)
+        private async Task<int> ReceiveExactAsync(Memory<byte> buffer)
         {
+            int total = 0;
             try
             {
-                if (!skt.Connected) return;
-
-                int len;
-                switch (sendState)
+                while (total < buffer.Length && socket.Connected && !cts.IsCancellationRequested)
                 {
-                    case SendState.Ready:
-                        len = (e.UserToken as SendToken).Packet.Write(parent, sendBuff, 0);
-
-                        sendState = SendState.Sending;
-                        e.SetBuffer(0, len);
-
-                        if (!skt.Connected) return;
-                        skt.SendAsync(e);
+                    int read;
+                    try
+                    {
+                        read = await socket.ReceiveAsync(buffer[total..], SocketFlags.None, cts.Token)
+                            .ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _logger?.LogWarning("ReceiveExactAsync cancelled while waiting for {bytesNeeded} bytes", 
+                            buffer.Length - total);
                         break;
-                    case SendState.Sending:
-                        (e.UserToken as SendToken).Packet = null;
-
-                        if (CanSendPacket(e, true))
-                        {
-                            len = (e.UserToken as SendToken).Packet.Write(parent, sendBuff, 0);
-
-                            sendState = SendState.Sending;
-                            e.SetBuffer(0, len);
-
-                            if (!skt.Connected) return;
-                            skt.SendAsync(e);
-                        }
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        _logger?.LogWarning("Socket disposed during ReceiveExactAsync.");
                         break;
+                    }
+                    catch (SocketException ex)
+                    {
+                        _logger?.LogError(ex, "SocketException in ReceiveExactAsync (Code {errorCode})", 
+                            ex.SocketErrorCode);
+                        break;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Unexpected exception in ReceiveExactAsync");
+                        break;
+                    }
+
+                    if (read == 0)
+                    {
+                        _logger?.LogWarning("Socket closed mid-read (had {total}/{bufferLength} bytes)", 
+                            total, buffer.Length);
+                        break;
+                    }
+
+                    total += read;
+                    _logger?.LogDebug("ReceiveExactAsync read {read} bytes ({total}/{bufferLength})", 
+                        read, total, buffer.Length);
                 }
             }
             catch (Exception ex)
             {
-                OnError(ex);
+                _logger?.LogError(ex, "ReceiveExactAsync outer exception");
             }
+
+            return total;
         }
 
 
-        private void OnError(Exception ex)
+        private async Task SendLoop()
         {
-            log.Error("Socket error.", ex);
-            parent.Disconnect();
-        }
-
-        private bool OnPacketReceived(Packet pkt)
-        {
-            if (parent.IsReady())
+            var buffer = ArrayPool<byte>.Shared.Rent(BUFFER_SIZE);
+            try
             {
-                parent.Manager.Network.AddPendingPacket(parent, pkt);
-                return true;
-            }
-            return false;
-        }
-
-        private bool CanSendPacket(SocketAsyncEventArgs e, bool ignoreSending)
-        {
-            lock (sendLock)
-            {
-                if (sendState == SendState.Ready ||
-                    (!ignoreSending && sendState == SendState.Sending))
-                    return false;
-                Packet packet;
-                if (pendingPackets.TryDequeue(out packet))
+                while (!cts.IsCancellationRequested && socket.Connected)
                 {
-                    (e.UserToken as SendToken).Packet = packet;
-                    sendState = SendState.Ready;
-                    return true;
+                    if (socket is not { Connected: true })
+                    {
+                        return;
+                    }
+
+                    if (!sendQueue.TryDequeue(out var packet))
+                    {
+                        await Task.Delay(5, cts.Token).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    int len = 0;
+                    try
+                    {
+                        len = packet.Write(parent, buffer, 0);
+                        await sendLock.WaitAsync(cts.Token).ConfigureAwait(false);
+                        await socket.SendAsync(buffer.AsMemory(0, len), SocketFlags.None, cts.Token)
+                            .ConfigureAwait(false);
+                        sendLock.Release();
+                        if (packet.ID != PacketID.PING && packet.ID != PacketID.PONG && packet.ID != PacketID.UPDATE &&
+                            packet.ID != PacketID.MOVE)
+                        {
+                            _logger?.LogDebug("Sent {packetType} [{len} bytes] to {endPoint}", 
+                                packet.GetType().Name, len, socket.RemoteEndPoint);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "Error sending packet ({packetType})", 
+                            packet?.GetType().Name ?? "null");
+                        break;
+                    }
                 }
-                sendState = SendState.Awaiting;
-                return false;
             }
-        }
-
-        public void SendPacket(Packet pkt)
-        {
-            if (!skt.Connected) return;
-            pendingPackets.Enqueue(pkt);
-            if (CanSendPacket(send, false))
+            catch (Exception ex)
             {
-                int len = (send.UserToken as SendToken).Packet.Write(parent, sendBuff, 0);
-
-                sendState = SendState.Sending;
-                send.SetBuffer(sendBuff, 0, len);
-                if (!skt.SendAsync(send))
-                    SendCompleted(this, send);
+                _logger?.LogError(ex, "Send loop failed");
             }
-        }
-
-        public void SendPackets(IEnumerable<Packet> pkts)
-        {
-            if (!skt.Connected) return;
-            foreach (Packet i in pkts)
-                pendingPackets.Enqueue(i);
-            if (CanSendPacket(send, false))
+            finally
             {
-                int len = (send.UserToken as SendToken).Packet.Write(parent, sendBuff, 0);
-
-                sendState = SendState.Sending;
-                send.SetBuffer(sendBuff, 0, len);
-                if (!skt.SendAsync(send))
-                    SendCompleted(this, send);
+                ArrayPool<byte>.Shared.Return(buffer);
             }
         }
 
-        private enum ReceiveState
+        private bool IsUsageRequest(byte[] header)
         {
-            Awaiting,
-            ReceivingHdr,
-            ReceivingBody,
-            Processing
+            return header[0] == 0x4d && header[1] == 0x61 &&
+                   header[2] == 0x64 && header[3] == 0x65 && header[4] == 0xff;
         }
 
-        private class ReceiveToken
+        private async Task SendUsageResponse()
         {
-            public int Length { get; set; }
-            public Packet Packet { get; set; }
+            var msg = $"{parent.Manager.MaxClients}:{parent.Manager.Clients.Count}";
+            var data = Encoding.ASCII.GetBytes(msg);
+            await socket.SendAsync(data, SocketFlags.None).ConfigureAwait(false);
+            _logger?.LogInformation("Sent usage info to {endPoint}", socket.RemoteEndPoint);
         }
 
-        private enum SendState
+        private bool IsPolicyRequest(byte[] header)
         {
-            Awaiting,
-            Ready,
-            Sending
+            return header[0] == 0x3c && header[1] == 0x70 &&
+                   header[2] == 0x6f && header[3] == 0x6c && header[4] == 0x69;
         }
 
-        private class SendToken
+        private async Task SendPolicyResponse()
         {
-            public Packet Packet;
+            const string xml = """
+                               <cross-domain-policy>
+                                   <allow-access-from domain="*" to-ports="*" />
+                               </cross-domain-policy>\r\n
+                               """;
+            var bytes = Encoding.UTF8.GetBytes(xml);
+            await socket.SendAsync(bytes, SocketFlags.None).ConfigureAwait(false);
+            _logger?.LogInformation("Sent policy file to {endPoint}", socket.RemoteEndPoint);
+        }
+
+        public void SendPacket(Packet packet)
+        {
+            if (!socket.Connected) return;
+            sendQueue.Enqueue(packet);
+        }
+
+        public void SendPackets(IEnumerable<Packet> packets)
+        {
+            if (!socket.Connected) return;
+            foreach (var pkt in packets)
+                sendQueue.Enqueue(pkt);
         }
 
         public void Dispose()
         {
-            send.Completed -= SendCompleted;
-            send.Dispose();
-            sendBuff = null;
-            receive.Completed -= ReceiveCompleted;
-            receive.Dispose();
-            receiveBuff = null;
+            if (_disposed) return;
+            _disposed = true;
+            _isRunning = false;
+
+            try
+            {
+                if (!cts.IsCancellationRequested)
+                {
+                    cts.Cancel();
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                socket?.Shutdown(SocketShutdown.Both);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                socket?.Dispose();
+            }
+            catch
+            {
+            }
+
+            sendQueue.Clear();
+
+            try
+            {
+                cts.Dispose();
+            }
+            catch
+            {
+            }
+
+            sendLock.Dispose();
         }
     }
 }

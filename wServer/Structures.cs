@@ -2,7 +2,9 @@
 
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using wServer.networking;
+using wServer.networking.svrPackets;
 using wServer.realm;
 
 #endregion
@@ -20,7 +22,7 @@ namespace wServer
             BitmapData ret = new BitmapData();
             ret.Width = rdr.ReadInt32();
             ret.Height = rdr.ReadInt32();
-            ret.Bytes = new byte[ret.Width*ret.Height*4];
+            ret.Bytes = new byte[ret.Width * ret.Height * 4];
             ret.Bytes = rdr.ReadBytes(ret.Bytes.Length);
             return ret;
         }
@@ -42,7 +44,7 @@ namespace wServer
 
         public int GetHashCode(IntPoint obj)
         {
-            return obj.X*23 << 16 + obj.Y*17;
+            return obj.X * 23 << 16 + obj.Y * 17;
         }
     }
 
@@ -116,10 +118,10 @@ namespace wServer
 
         public ARGB(uint argb)
         {
-            A = (byte) ((argb & 0xff000000) >> 24);
-            R = (byte) ((argb & 0x00ff0000) >> 16);
-            G = (byte) ((argb & 0x0000ff00) >> 8);
-            B = (byte) ((argb & 0x000000ff) >> 0);
+            A = (byte)((argb & 0xff000000) >> 24);
+            R = (byte)((argb & 0x00ff0000) >> 16);
+            G = (byte)((argb & 0x0000ff00) >> 8);
+            B = (byte)((argb & 0x000000ff) >> 0);
         }
 
         public static ARGB Read(Client psr, NReader rdr)
@@ -144,7 +146,7 @@ namespace wServer
     public struct ObjectSlot
     {
         public int ObjectId;
-        public ushort ObjectType;
+        public int ObjectType;
         public byte SlotId;
 
         public static ObjectSlot Read(Client psr, NReader rdr)
@@ -152,7 +154,7 @@ namespace wServer
             ObjectSlot ret = new ObjectSlot();
             ret.ObjectId = rdr.ReadInt32();
             ret.SlotId = rdr.ReadByte();
-            ret.ObjectType = (ushort)rdr.ReadInt16();
+            ret.ObjectType = rdr.ReadInt32();
             return ret;
         }
 
@@ -259,12 +261,13 @@ namespace wServer
             ret.Stats = new KeyValuePair<StatsType, object>[rdr.ReadInt16()];
             for (int i = 0; i < ret.Stats.Length; i++)
             {
-                StatsType type = (StatsType) rdr.ReadByte();
+                StatsType type = (StatsType)rdr.ReadByte();
                 if (type == StatsType.Guild || type == StatsType.Name)
                     ret.Stats[i] = new KeyValuePair<StatsType, object>(type, rdr.ReadUTF());
                 else
                     ret.Stats[i] = new KeyValuePair<StatsType, object>(type, rdr.ReadInt32());
             }
+
             return ret;
         }
 
@@ -272,17 +275,26 @@ namespace wServer
         {
             try
             {
-                wtr.Write(Id);
+                ServerPacket.WriteCompressedInt(wtr, Id);
                 Position.Write(psr, wtr);
-                wtr.Write((ushort)Stats.Length);
+                ServerPacket.WriteCompressedInt(wtr, Stats.Length);
                 foreach (KeyValuePair<StatsType, object> i in Stats)
                 {
                     wtr.Write((byte)i.Key);
-                    if (i.Key.IsUTF() && i.Value != null) wtr.WriteUTF(i.Value.ToString());
-                    else wtr.Write((int)i.Value);
+                    if (i.Key.IsUTF() && i.Value != null)
+                    {
+                        wtr.WriteUTF(i.Value.ToString());
+                    }
+                    else
+                    {
+                        ServerPacket.WriteCompressedInt(wtr, (int)(i.Value ?? 0));
+                    }
                 }
             }
-            catch(Exception) { }
+            catch (Exception e)
+            {
+                Program.Logger.LogError(e, "Error while serializing ObjectStats");
+            }
         }
     }
 }

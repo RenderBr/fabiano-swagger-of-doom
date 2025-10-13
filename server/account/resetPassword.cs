@@ -1,30 +1,31 @@
-﻿using db;
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Web;
+﻿using System.IO;
+using System.Threading.Tasks;
+using db.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace server.account
 {
     internal class resetPassword : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+            var account = await accountRepository.GetByAuthTokenAsync(Query["authToken"]);
+            if (account != null)
             {
-                string password = Database.GenerateRandomString(10);
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "UPDATE accounts SET password=SHA1(@password) WHERE authToken=@authToken;";
-                cmd.Parameters.AddWithValue("@password", password);
-                cmd.Parameters.AddWithValue("@authToken", Query["authToken"]);
-                bool success = cmd.ExecuteNonQuery() > 0;
+                string password = Utils.GenerateRandomString(10);
+                account.Password = Utils.Sha1(password);
+                await accountRepository.SaveChangesAsync();
+
                 using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                {
-                    if (success)
-                        wtr.Write(resetPasswordSuccess.Replace("{PASSWORD}", password).Replace("{SERVERDOMAIN}", Program.Settings.GetValue<string>("serverDomain", "localhost")));
-                    else
-                        wtr.Write(resetPasswordFailure);
-                }
+                    wtr.Write(resetPasswordSuccess.Replace("{PASSWORD}", password).Replace("{SERVERDOMAIN}", Program.Config.ServerDomain));
+            }
+            else
+            {
+                using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
+                    wtr.Write(resetPasswordFailure);
             }
         }
 

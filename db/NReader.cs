@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using System.Buffers.Binary;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -15,32 +16,32 @@ public class NReader : BinaryReader
 
     public override short ReadInt16()
     {
-        return IPAddress.NetworkToHostOrder(base.ReadInt16());
+        return BinaryPrimitives.ReadInt16BigEndian(base.ReadBytes(2));
     }
 
     public override int ReadInt32()
     {
-        return IPAddress.NetworkToHostOrder(base.ReadInt32());
+        return BinaryPrimitives.ReadInt32BigEndian(base.ReadBytes(4));
     }
 
     public override long ReadInt64()
     {
-        return IPAddress.NetworkToHostOrder(base.ReadInt64());
+        return BinaryPrimitives.ReadInt64BigEndian(base.ReadBytes(8));
     }
 
     public override ushort ReadUInt16()
     {
-        return (ushort) IPAddress.NetworkToHostOrder((short) base.ReadUInt16());
+        return BinaryPrimitives.ReadUInt16BigEndian(base.ReadBytes(2));
     }
 
     public override uint ReadUInt32()
     {
-        return (uint) IPAddress.NetworkToHostOrder((int) base.ReadUInt32());
+        return BinaryPrimitives.ReadUInt32BigEndian(base.ReadBytes(4));
     }
 
     public override ulong ReadUInt64()
     {
-        return (ulong) IPAddress.NetworkToHostOrder((long) base.ReadUInt64());
+        return BinaryPrimitives.ReadUInt64BigEndian(base.ReadBytes(8));
     }
 
     public override float ReadSingle()
@@ -63,16 +64,22 @@ public class NReader : BinaryReader
         byte b = ReadByte();
         while (b != 0)
         {
-            ret.Append((char) b);
+            ret.Append((char)b);
             b = ReadByte();
         }
+
         return ret.ToString();
     }
 
     public string ReadUTF()
     {
-        return Encoding.UTF8.GetString(ReadBytes(ReadInt16()));
+        ushort len = ReadUInt16();           
+        byte[] data = ReadBytes(len);        
+        string s = Encoding.UTF8.GetString(data);
+
+        return s;
     }
+
 
     public string Read32UTF()
     {

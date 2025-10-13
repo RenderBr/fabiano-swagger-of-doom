@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Xml.Linq;
+using RageRealm.Shared.Models;
 
 #endregion
 
@@ -36,7 +37,7 @@ namespace wServer.realm.entities
             {
                 Item[] inv =
                     Utils.FromCommaSepString16(eq.Value)
-                        .Select(_ => _ == -1 ? null : manager.GameData.Items[(ushort)_])
+                        .Select(_ => _ == -1 ? null : manager.GameDataService.Items[(ushort)_])
                         .ToArray();
                 Array.Resize(ref inv, 8);
                 Inventory = inv;

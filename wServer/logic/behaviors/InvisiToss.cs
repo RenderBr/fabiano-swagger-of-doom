@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -21,7 +22,7 @@ namespace wServer.logic.behaviors
         public InvisiToss(string child, double range = 5, double? angle = null,
             Cooldown coolDown = new Cooldown(), int coolDownOffset = 0)
         {
-            this.child = BehaviorDb.InitGameData.IdToObjectType[child];
+            this.child = BehaviorDb.InitGameDataService.IdToObjectType[child];
             this.range = range;
             this.angle = angle*Math.PI/180;
             this.coolDown = coolDown.Normalize();

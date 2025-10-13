@@ -2,6 +2,8 @@
 
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.terrain;
@@ -24,10 +26,10 @@ namespace wServer.realm.worlds
             AllowTeleport = false;
             Difficulty = -1;
         }
-
-        protected override void Init()
+        
+        protected override async Task InitAsync()
         {
-            LoadMap(SUMMER_RESOURCE, MapType.Json);
+            await LoadMapAsync(SUMMER_RESOURCE, MapType.Json);
         }
 
         public override void Tick(RealmTime time)
@@ -65,10 +67,10 @@ namespace wServer.realm.worlds
             {
                 foreach (var j in RealmManager.CurrentRealmNames)
                 {
-                    if (i.Value.Name.StartsWith(j))
+                    if (i.Value.Name.StartsWith(j.Key))
                     {
-                        if (i.Value.Name == j) (i.Value as Portal).PortalName = i.Value.Name;
-                        i.Value.Name = j + " (" + i.Key.Players.Count + "/" + RealmManager.MAX_REALM_PLAYERS + ")";
+                        if (i.Value.Name == j.Key) (i.Value as Portal).PortalName = i.Value.Name;
+                        i.Value.Name = j.Key + " (" + i.Key.Players.Count + "/" + RealmManager.MAX_REALM_PLAYERS + ")";
                         i.Value.UpdateCount++;
                         break;
                     }

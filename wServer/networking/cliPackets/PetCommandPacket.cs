@@ -17,7 +17,7 @@ namespace wServer.networking.cliPackets
 
         public override PacketID ID
         {
-            get { return PacketID.PETCOMMAND; }
+            get { return PacketID.ACTIVEPETUPDATE; }
         }
 
         public override Packet CreateInstance()

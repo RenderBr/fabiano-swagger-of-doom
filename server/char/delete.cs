@@ -4,9 +4,13 @@ using System.Collections.Specialized;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web;
 using db;
-using MySql.Data.MySqlClient;
+using db.Models;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -14,25 +18,28 @@ namespace server.@char
 {
     internal class delete : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+            var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            byte[] status = new byte[0];
+            if (acc != null)
             {
-                Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-                byte[] status = new byte[0];
-                if (CheckAccount(acc, db))
+                var character = await unitOfWork.Characters.GetByCharacterIdAsync(acc.Id, int.Parse(Query["charId"]));
+                if (character != null)
                 {
-                    MySqlCommand cmd = db.CreateQuery();
-                    cmd.CommandText = @"DELETE FROM characters WHERE accId = @accId AND charId = @charId;";
-                    cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                    cmd.Parameters.AddWithValue("@charId", Query["charId"]);
-                    if (cmd.ExecuteNonQuery() > 0)
-                        status = Encoding.UTF8.GetBytes("<Success />");
-                    else
-                        status = Encoding.UTF8.GetBytes("<Error>Internal Error</Error>");
+                    await unitOfWork.Characters.DeleteAsync(character);
+                    status = Encoding.UTF8.GetBytes("<Success />");
                 }
-                Context.Response.OutputStream.Write(status, 0, status.Length);
+                else
+                {
+                    status = Encoding.UTF8.GetBytes("<Error>Character not found</Error>");
+                }
             }
+            Context.Response.OutputStream.Write(status, 0, status.Length);
         }
     }
 }

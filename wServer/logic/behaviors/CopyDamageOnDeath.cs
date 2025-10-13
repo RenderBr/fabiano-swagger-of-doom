@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -24,7 +25,7 @@ namespace wServer.logic.behaviors
             parent.Death += (sender, e) =>
             {
                 Enemy en;
-                if ((en = e.Host.GetNearestEntity(dist, e.Host.Manager.GameData.IdToObjectType[child]) as Enemy) != null)
+                if ((en = e.Host.GetNearestEntity(dist, e.Host.Manager.GameDataService.IdToObjectType[child]) as Enemy) != null)
                 {
                     en.SetDamageCounter((e.Host as Enemy).DamageCounter, en);
                 }

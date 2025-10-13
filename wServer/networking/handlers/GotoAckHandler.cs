@@ -1,5 +1,6 @@
 ﻿#region
 
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 
 #endregion
@@ -13,9 +14,10 @@ namespace wServer.networking.handlers
             get { return PacketID.GOTOACK; }
         }
 
-        protected override void HandlePacket(Client client, GotoAckPacket packet)
+        protected override Task HandlePacket(Client client, GotoAckPacket packet)
         {
             //TODO: Implement something.
+            return Task.CompletedTask;
         }
     }
 }

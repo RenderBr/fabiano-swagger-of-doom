@@ -1,5 +1,6 @@
 ﻿using Mono.Game;
 using System;
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 namespace wServer.logic.behaviors

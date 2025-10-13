@@ -62,7 +62,7 @@ namespace wServer.realm.setpieces
 
         public void RenderSetPiece(World world, IntPoint pos)
         {
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
             for (int x = 0; x < Size; x++)
             {
                 for (int y = 0; y < Size; y++)

@@ -3,6 +3,7 @@
 using System;
 using System.IO;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Encodings;
 using Org.BouncyCastle.Crypto.Engines;
@@ -52,12 +53,20 @@ iIPdpI1PxFDcnFbdRQIDAQAB
 
         public string Decrypt(string str)
         {
-            if (string.IsNullOrEmpty(str))
-                return "";
-            byte[] dat = Convert.FromBase64String(str);
-            Pkcs1Encoding encoding = new Pkcs1Encoding(engine);
-            encoding.Init(false, key);
-            return Encoding.UTF8.GetString(encoding.ProcessBlock(dat, 0, dat.Length));
+            try
+            {
+                if (string.IsNullOrEmpty(str))
+                    return "";
+                byte[] dat = Convert.FromBase64String(str);
+                Pkcs1Encoding encoding = new Pkcs1Encoding(engine);
+                encoding.Init(false, key);
+                return Encoding.UTF8.GetString(encoding.ProcessBlock(dat, 0, dat.Length));
+            }catch(Exception e)
+            {
+                Program.Logger.LogError(e,"RSA Decrypt error");
+                Program.Logger.LogError("Data: {Data} ", str);
+                return null;
+            }
         }
 
         public string Encrypt(string str)

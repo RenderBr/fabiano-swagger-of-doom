@@ -1,6 +1,7 @@
 ﻿#region
 
 using System;
+using RageRealm.Shared.Models;
 using wServer.realm;
 using wServer.realm.entities;
 
@@ -21,7 +22,7 @@ namespace wServer.logic.behaviors
         public Reproduce(string children = null, double densityRadius = 10, int densityMax = 5, double spawnRadius = -1,
             Cooldown coolDown = new Cooldown())
         {
-            this.children = children == null ? null : (ushort?) BehaviorDb.InitGameData.IdToObjectType[children];
+            this.children = children == null ? null : (ushort?) BehaviorDb.InitGameDataService.IdToObjectType[children];
             this.densityRadius = densityRadius;
             this.densityMax = densityMax;
             this.coolDown = coolDown.Normalize(60000);

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.networking.svrPackets;
@@ -15,9 +16,10 @@ namespace wServer.networking.handlers
     {
         public override PacketID ID { get { return PacketID.CHANGEGUILDRANK; } }
 
-        protected override void HandlePacket(Client client, ChangeGuildRankPacket packet)
+        protected override Task HandlePacket(Client client, ChangeGuildRankPacket packet)
         {
             client.Manager.Logic.AddPendingAction(t => Handle(client, packet));
+            return Task.CompletedTask;
         }
 
         void Handle(Client client, ChangeGuildRankPacket packet)
@@ -30,7 +32,7 @@ namespace wServer.networking.handlers
                     if (other != null && other.Guild.Name == client.Player.Guild.Name)
                     {
                         other.Guild[other.AccountId].Rank = packet.GuildRank;
-                        other.Client.Account.Guild.Rank = packet.GuildRank;
+                        other.Client.Account.GuildRank = (byte)packet.GuildRank;
                         db.ChangeGuild(other.Client.Account, other.Client.Account.Guild.Id, other.Guild[other.AccountId].Rank, other.Client.Account.Guild.Fame, false);
                         other.UpdateCount++;
                         foreach(Player p in client.Player.Guild)
@@ -40,8 +42,8 @@ namespace wServer.networking.handlers
                     {
                         try
                         {
-                            var acc = db.GetAccountByName(packet.Name, Manager.GameData);
-                            if (acc.Guild.Name == client.Player.Guild.Name)
+                            var acc = db.GetAccountByName(packet.Name, Manager.GameDataService).GetAwaiter().GetResult();
+                            if (acc != null && acc.Guild != null && acc.Guild.Name == client.Player.Guild.Name)
                             {
                                 db.ChangeGuild(acc, acc.Guild.Id, packet.GuildRank, acc.Guild.Fame, false);
                                 foreach (Player p in client.Player.Guild)

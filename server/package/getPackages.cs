@@ -1,13 +1,19 @@
 ﻿#region
 
 using db;
+using db.Repositories;
+using db.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
+using System.Linq;
 using System.Net;
+using System.Threading.Tasks;
 using System.Web;
 using System.Xml;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -17,12 +23,14 @@ namespace server.package
     {
         internal static Dictionary<string, Package> CurrentPackages { get; set; }
 
-        protected override void HandleRequest()
+        protected override Task HandleRequest()
         {
             string s = Serialize();
 
-            using (StreamWriter wtr = new StreamWriter(Context.Response.OutputStream))
-                wtr.Write(s);
+            using StreamWriter wtr = new StreamWriter(Context.Response.OutputStream);
+            wtr.Write(s);
+            
+            return Task.CompletedTask;
         }
 
         internal static string Serialize()
@@ -34,52 +42,48 @@ namespace server.package
             XmlNode packages = doc.CreateElement("Packages");
             packageResponse.AppendChild(packages);
 
-            using (Database db = new Database())
+            using (var scope = Program.Services.CreateScope())
             {
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT * FROM packages WHERE endDate >= @now;";
-                cmd.Parameters.AddWithValue("@now", DateTime.UtcNow);
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var activePackages = unitOfWork.Context.Packages.Where(p => p.EndDate >= DateTime.UtcNow).ToList();
 
-                using (var rdr = cmd.ExecuteReader())
+                foreach (var pkg in activePackages)
                 {
-                    while (rdr.Read())
-                    {
-                        XmlNode packageElem = doc.CreateElement("Package");
-                        XmlAttribute packageElemId = doc.CreateAttribute("id");
-                        packageElemId.Value = rdr.GetString("id");
-                        packageElem.Attributes.Append(packageElemId);
+                    XmlNode packageElem = doc.CreateElement("Package");
+                    XmlAttribute packageElemId = doc.CreateAttribute("id");
+                    packageElemId.Value = pkg.Id.ToString();
+                    packageElem.Attributes.Append(packageElemId);
 
-                        XmlNode name = doc.CreateElement("Name");
-                        name.InnerText = rdr.GetString("name");
-                        packageElem.AppendChild(name);
+                    XmlNode name = doc.CreateElement("Name");
+                    name.InnerText = pkg.Name;
+                    packageElem.AppendChild(name);
 
-                        XmlNode price = doc.CreateElement("Price");
-                        price.InnerText = rdr.GetString("price");
-                        packageElem.AppendChild(price);
+                    XmlNode price = doc.CreateElement("Price");
+                    price.InnerText = pkg.Price.ToString();
+                    packageElem.AppendChild(price);
 
-                        XmlNode quantity = doc.CreateElement("Quantity");
-                        quantity.InnerText = rdr.GetString("quantity");
-                        packageElem.AppendChild(quantity);
+                    XmlNode quantity = doc.CreateElement("Quantity");
+                    quantity.InnerText = pkg.Quantity.ToString();
+                    packageElem.AppendChild(quantity);
 
-                        XmlNode maxPurchase = doc.CreateElement("MaxPurchase");
-                        maxPurchase.InnerText = rdr.GetString("maxPurchase");
-                        packageElem.AppendChild(maxPurchase);
+                    XmlNode maxPurchase = doc.CreateElement("MaxPurchase");
+                    maxPurchase.InnerText = pkg.MaxPurchase.ToString();
+                    packageElem.AppendChild(maxPurchase);
 
-                        XmlNode weight = doc.CreateElement("Weight");
-                        weight.InnerText = rdr.GetString("weight");
-                        packageElem.AppendChild(weight);
+                    XmlNode weight = doc.CreateElement("Weight");
+                    weight.InnerText = pkg.Weight.ToString();
+                    packageElem.AppendChild(weight);
 
-                        XmlNode bgUrl = doc.CreateElement("BgURL");
-                        bgUrl.InnerText = rdr.GetString("bgUrl");
-                        packageElem.AppendChild(bgUrl);
+                    XmlNode bgUrl = doc.CreateElement("BgURL");
+                    bgUrl.InnerText = pkg.BgUrl;
+                    packageElem.AppendChild(bgUrl);
 
-                        XmlNode endDate = doc.CreateElement("EndDate");
-                        DateTime dt = rdr.GetDateTime("endDate").Kind != DateTimeKind.Utc ?
-                            rdr.GetDateTime("endDate").ToUniversalTime() : rdr.GetDateTime("endDate");
-                        endDate.InnerText = String.Format("{0}/{1}/{2} {3} GMT-0000", dt.Day, dt.Month, dt.Year, dt.ToLongTimeString());
-                        packageElem.AppendChild(endDate);
-                        packages.AppendChild(packageElem);
-                    }
+                    XmlNode endDate = doc.CreateElement("EndDate");
+                    DateTime dt = pkg.EndDate.Kind != DateTimeKind.Utc ?
+                        pkg.EndDate.ToUniversalTime() : pkg.EndDate;
+                    endDate.InnerText = String.Format("{0}/{1}/{2} {3} GMT-0000", dt.Day, dt.Month, dt.Year, dt.ToLongTimeString());
+                    packageElem.AppendChild(endDate);
+                    packages.AppendChild(packageElem);
                 }
             }
 
@@ -104,30 +108,24 @@ namespace server.package
 
         internal static Package GetPackage(int id)
         {
-            using (Database db = new Database())
+            using (var scope = Program.Services.CreateScope())
             {
-                var cmd = db.CreateQuery();
-                cmd.CommandText = "SELECT * FROM packages WHERE id=@id AND endDate >= now();";
-                cmd.Parameters.AddWithValue("@id", id);
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+                var pkg = unitOfWork.Context.Packages.FirstOrDefault(p => p.Id == id && p.EndDate >= DateTime.UtcNow);
+                if (pkg == null) return null;
 
-                using (var rdr = cmd.ExecuteReader())
+                return new Package
                 {
-                    if (!rdr.HasRows) return null;
-                    rdr.Read();
-
-                    return new Package
-                    {
-                        BgURL = rdr.GetString("bgUrl"),
-                        EndDate = rdr.GetDateTime("endDate"),
-                        Weight = rdr.GetInt32("weight"),
-                        MaxPurchase = rdr.GetInt32("maxPurchase"),
-                        Name = rdr.GetString("name"),
-                        PackageId = rdr.GetInt32("id"),
-                        Price = rdr.GetInt32("price"),
-                        Quantity = rdr.GetInt32("quantity"),
-                        Contents = rdr.GetString("contents")
-                    };
-                }
+                    BgURL = pkg.BgUrl,
+                    EndDate = pkg.EndDate,
+                    Weight = pkg.Weight,
+                    MaxPurchase = pkg.MaxPurchase,
+                    Name = pkg.Name,
+                    PackageId = pkg.Id,
+                    Price = pkg.Price,
+                    Quantity = pkg.Quantity,
+                    Contents = pkg.Contents
+                };
             }
         }
     }

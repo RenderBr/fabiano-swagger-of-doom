@@ -1,12 +1,9 @@
 ﻿#region
 
-using System.Collections.Specialized;
-using System.IO;
-using System.Net;
-using System.Text;
-using System.Web;
-using db;
-using MySql.Data.MySqlClient;
+using System.Threading.Tasks;
+using db.Repositories;
+using db.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -14,40 +11,25 @@ namespace server.account
 {
     internal class purchaseCharSlot : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
-            using (Database db = new Database())
+            using var scope = Program.Services.CreateScope();
+            var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+            var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+
+            var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
+            if (await CheckAccount(acc))
             {
-                Account acc = db.Verify(Query["guid"], Query["password"], Program.GameData);
-                byte[] status = new byte[0];
-                if (CheckAccount(acc, db))
+                int charSlotPrice = 100; // Assuming fixed price
+                if (acc.Stats.Credits < charSlotPrice)
+                    WriteErrorLine("Not enough Gold");
+                else
                 {
-                    MySqlCommand cmd = db.CreateQuery();
-                    cmd.CommandText = "SELECT credits FROM stats WHERE accId=@accId;";
-                    cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                    if ((int) cmd.ExecuteScalar() < acc.NextCharSlotPrice)
-                        status = Encoding.UTF8.GetBytes("<Error>Not enough Gold</Error>");
-                    else
-                    {
-                        cmd = db.CreateQuery();
-                        cmd.CommandText = "UPDATE stats SET credits = credits - @charSlotPrice WHERE accId=@accId";
-                        cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                        cmd.Parameters.AddWithValue("@charSlotPrice", acc.NextCharSlotPrice);
-                        if (cmd.ExecuteNonQuery() > 0)
-                        {
-                            cmd = db.CreateQuery();
-                            cmd.CommandText = "UPDATE accounts SET maxCharSlot = maxCharSlot + 1 WHERE id=@accId";
-                            cmd.Parameters.AddWithValue("@accId", acc.AccountId);
-                            if (cmd.ExecuteNonQuery() > 0)
-                                status = Encoding.UTF8.GetBytes("<Success/>");
-                            else
-                                status = Encoding.UTF8.GetBytes("<Error>Internal Error</Error>");
-                        }
-                        else
-                            status = Encoding.UTF8.GetBytes("<Error>Internal Error</Error>");
-                    }
+                    acc.Stats.Credits -= charSlotPrice;
+                    acc.MaxCharSlot += 1;
+                    await accountRepository.SaveChangesAsync();
+                    WriteLine("<Success/>");
                 }
-                Context.Response.OutputStream.Write(status, 0, status.Length);
             }
         }
     }

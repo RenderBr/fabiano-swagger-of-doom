@@ -1,5 +1,6 @@
 ﻿#region
 
+using RageRealm.Shared.Models;
 using wServer.realm;
 
 #endregion
@@ -18,8 +19,8 @@ namespace wServer.logic.transitions
             : base(targetState)
         {
             this.dist = dist;
-            this.target = BehaviorDb.InitGameData.IdToObjectType[target];
-            this.target2 = BehaviorDb.InitGameData.IdToObjectType[target2];
+            this.target = BehaviorDb.InitGameDataService.IdToObjectType[target];
+            this.target2 = BehaviorDb.InitGameDataService.IdToObjectType[target2];
         }
 
         protected override bool TickCore(Entity host, RealmTime time, ref object state)

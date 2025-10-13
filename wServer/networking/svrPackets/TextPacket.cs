@@ -9,6 +9,8 @@
         public string Recipient { get; set; }
         public string Text { get; set; }
         public string CleanText { get; set; }
+        public bool IsSupporter { get; set; } = false;
+        public int StarBg { get; set; } = 0;
 
         public override PacketID ID
         {
@@ -40,6 +42,8 @@
             wtr.WriteUTF(Recipient);
             wtr.WriteUTF(Text);
             wtr.WriteUTF(CleanText);
+            wtr.Write(IsSupporter);
+            wtr.Write(StarBg);
         }
     }
 }

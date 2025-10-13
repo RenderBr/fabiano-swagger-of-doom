@@ -75,7 +75,7 @@ namespace wServer.realm.setpieces
                     if (noise.GetNoise(x/33f*8, y/33f*8, .5f) < 0.2)
                         t[x, y] = 0;
 
-            XmlData dat = world.Manager.GameData;
+            XmlDataService dat = world.Manager.GameDataService;
             for (int x = 0; x < 33; x++) //Rendering
                 for (int y = 0; y < 33; y++)
                 {

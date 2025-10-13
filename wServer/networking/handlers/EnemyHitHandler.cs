@@ -1,5 +1,7 @@
 ﻿#region
 
+using System.Threading.Tasks;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.realm.entities;
@@ -15,9 +17,9 @@ namespace wServer.networking.handlers
             get { return PacketID.ENEMYHIT; }
         }
 
-        protected override void HandlePacket(Client client, EnemyHitPacket packet)
+        protected override Task HandlePacket(Client client, EnemyHitPacket packet)
         {
-            if (client.Player.Owner == null) return;
+            if (client.Player.Owner == null) return Task.CompletedTask;
 
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -29,6 +31,8 @@ namespace wServer.networking.handlers
                         prj.ForceHit(entity, t);
                 }
             }, PendingPriority.Networking);
+            
+            return Task.CompletedTask;
         }
     }
 }

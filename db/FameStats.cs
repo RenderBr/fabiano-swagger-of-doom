@@ -5,6 +5,7 @@ using System.IO;
 using System.Xml;
 using System.Xml.Serialization;
 using db.data;
+using db.Models;
 
 #endregion
 
@@ -122,7 +123,7 @@ public class FameStats
         return ret.ToArray();
     }
 
-    public int CalculateTotal(XmlData data, Account acc, Char chr, int baseFame, out bool firstBorn)
+    public int CalculateTotal(XmlDataService dataService, Account acc, Char chr, int baseFame, out bool firstBorn)
     {
         double bonus = 0;
         if (chr.CharacterId < 2)            //Ancestor
@@ -211,7 +212,7 @@ public class FameStats
         for (int i = 0; i < 4; i++)         //Well Equipped
         {
             if (chr.Equipment[i] == -1) continue;
-            var b = data.Items[(ushort)chr.Equipment[i]].FameBonus;
+            var b = dataService.Items[(ushort)chr.Equipment[i]].FameBonus;
             if (b > 0)
                 eq += (baseFame + Math.Floor(bonus)) * b / 100;
         }
@@ -227,7 +228,7 @@ public class FameStats
         return (int)(baseFame + Math.Floor(bonus));
     }
 
-    private void SerializeBonus(XmlData data, XmlDocument doc, Account acc, Char chr, int baseFame, bool firstBorn)
+    private void SerializeBonus(XmlDataService dataService, XmlDocument doc, Account acc, Char chr, int baseFame, bool firstBorn)
     {
         double bonus = 0;
         if (chr.CharacterId < 2) //Ancestor
@@ -478,7 +479,7 @@ public class FameStats
         for (int i = 0; i < 4; i++) //Well Equipped
         {
             if (chr.Equipment[i] == -1) continue;
-            int b = data.Items[(ushort)chr.Equipment[i]].FameBonus;
+            int b = dataService.Items[(ushort)chr.Equipment[i]].FameBonus;
             if (b > 0)
                 bo += (baseFame + Math.Floor(bonus)) * b / 100;
         }
@@ -510,7 +511,7 @@ public class FameStats
         }
     }
 
-    public string Serialize(XmlData data, Account acc, Char chr, int time, string killer, bool firstBorn)
+    public string Serialize(XmlDataService dataService, Account acc, Char chr, int time, string killer, bool firstBorn)
     {
         __Char = chr;
         XmlDocument xmlDoc = new XmlDocument();
@@ -527,13 +528,13 @@ public class FameStats
 
         xmlDoc.SelectSingleNode("/Fame/Char").AppendChild(ac);
 
-        SerializeBonus(data, xmlDoc, acc, chr, chr.CurrentFame, firstBorn);
+        SerializeBonus(dataService, xmlDoc, acc, chr, chr.CurrentFame, firstBorn);
 
         XmlElement basFame = xmlDoc.CreateElement("BaseFame");
         basFame.InnerText = chr.CurrentFame.ToString();
         xmlDoc.DocumentElement.AppendChild(basFame);
         XmlElement totalFame = xmlDoc.CreateElement("TotalFame");
-        totalFame.InnerText = CalculateTotal(data, acc, chr, chr.CurrentFame, out firstBorn).ToString();
+        totalFame.InnerText = CalculateTotal(dataService, acc, chr, chr.CurrentFame, out firstBorn).ToString();
         xmlDoc.DocumentElement.AppendChild(totalFame);
         XmlElement deathTime = xmlDoc.CreateElement("CreatedOn");
         deathTime.InnerText = time.ToString();

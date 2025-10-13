@@ -4,64 +4,99 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using log4net;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using wServer.realm;
 
 #endregion
 
 namespace wServer.networking
 {
-    internal class Server
+    internal class Server : IDisposable
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof (Server));
+        private readonly ILogger<Server> _logger;
+        private bool _running;
 
         public Server(RealmManager manager)
         {
+            _logger = Program.Services?.GetRequiredService<ILogger<Server>>();
             Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             Manager = manager;
         }
 
-        public Socket Socket { get; private set; }
-        public RealmManager Manager { get; private set; }
+        public Socket Socket { get; }
+        public RealmManager Manager { get; }
 
-        public void Start()
+        public async Task StartAsync()
         {
-            log.Info("Starting server...");
-            Socket.Bind(new IPEndPoint(IPAddress.Any, Program.Settings.GetValue<int>("port")));
-            Socket.Listen(0xff);
-            Socket.BeginAccept(Listen, null);
+            _logger?.LogInformation("Starting server...");
+            Socket.Bind(new IPEndPoint(IPAddress.Any, Program.Config.Realm.ServerPort));
+            Socket.Listen(255);
+            _running = true;
+
+            // accept loop
+            _ = Task.Run(AcceptLoopAsync);
+            await Task.CompletedTask;
         }
 
-        private void Listen(IAsyncResult ar)
+        private async Task AcceptLoopAsync()
         {
-            Socket skt = null;
-            try
+            while (_running)
             {
-                skt = Socket.EndAccept(ar);
+                try
+                {
+                    var skt = await Socket.AcceptAsync().ConfigureAwait(false);
+                    _ = Task.Run(() => new Client(Manager, skt));
+                }
+                catch (ObjectDisposedException)
+                {
+                    // occurs during shutdown
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError(ex, "Error accepting connection");
+                    await Task.Delay(100).ConfigureAwait(false);
+                }
             }
-            catch (ObjectDisposedException)
-            {
-            }
-            try
-            {
-                Socket.BeginAccept(Listen, null);
-            }
-            catch (ObjectDisposedException)
-            {
-            }
-            if (skt != null)
-                new Client(Manager, skt);
         }
 
-        public async void Stop()
+        public async Task StopAsync()
         {
-            log.Info("Stoping server...");
-            foreach (Client i in Manager.Clients.Values.ToArray())
+            _logger?.LogInformation("Stopping server...");
+            _running = false;
+
+            try
             {
-                await i.Save();
-                i.Disconnect();
+                Socket.Close();
             }
-            Socket.Close();
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "Error closing socket");
+            }
+
+            // save & disconnect all clients
+            var clients = Manager.Clients.Values.ToArray();
+            foreach (var client in clients)
+            {
+                try
+                {
+                    await client.Save().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Failed to save client {ClientName}", client?.Account?.Name);
+                }
+
+                client?.Disconnect();
+            }
+        }
+
+        public void Dispose()
+        {
+            _running = false;
+            Socket?.Dispose();
         }
     }
 }

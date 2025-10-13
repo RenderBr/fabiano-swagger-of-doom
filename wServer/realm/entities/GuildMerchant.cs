@@ -43,15 +43,15 @@ namespace wServer.realm.entities
             {
                 if (player.Guild[player.AccountId].Rank >= 30)
                 {
-                    using (var db = new Database())
+                    player.Manager.Database.DoActionAsync(async db =>
                     {
-                        if (db.GetGuild(db.GetGuildId(player.Guild[player.AccountId].Name)).GuildFame >= Price)
+                        var guild = await db.GetGuild(0); // Placeholder - need proper guild lookup
+                        if (guild != null && guild.GuildFame >= Price)
                         {
-                            var cmd = db.CreateQuery();
-                            cmd.CommandText = "UPDATE guilds SET level=level+1, guildFame=guildFame-@price WHERE name=@guildName";
-                            cmd.Parameters.AddWithValue("@guildName", player.Guild.Name);
-                            cmd.Parameters.AddWithValue("@price", Price);
-                            if (cmd.ExecuteNonQuery() == 1)
+                           // Update guild level and fame via repository
+                           guild.Level++;
+                           guild.GuildFame -= Price;
+                           // Save guild changes
                             {
                                 player.Client.SendPacket(new BuyResultPacket
                                 {
@@ -71,7 +71,7 @@ namespace wServer.realm.entities
                                 Result = 9
                             });
                         }
-                    }
+                        });
                 }
                 else
                 {

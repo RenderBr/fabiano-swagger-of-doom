@@ -4,14 +4,17 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Net.Sockets;
-using log4net;
-using log4net.Core;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
 using wServer.realm.entities.player;
 using System.Threading.Tasks;
 using db.JsonObjects;
+using db.Models;
+using RageRealm.Shared.Models;
+using FailurePacket = wServer.networking.cliPackets.FailurePacket;
 
 #endregion
 
@@ -27,10 +30,10 @@ namespace wServer.networking
 
     public class Client : IDisposable
     {
-        public const string SERVER_VERSION = "27.3.2";
+        public const string SERVER_VERSION = "1.0.3.0";
         private bool disposed;
 
-        private static readonly ILog log = LogManager.GetLogger(typeof (Client));
+        private static readonly ILogger log = Program.Services?.GetRequiredService<ILogger<Client>>();
 
         public uint UpdateAckCount = 0;
 
@@ -41,8 +44,9 @@ namespace wServer.networking
             Socket = skt;
             Manager = manager;
             ReceiveKey =
-                new RC4(new byte[] {0x31, 0x1f, 0x80, 0x69, 0x14, 0x51, 0xc7, 0x1d, 0x09, 0xa1, 0x3a, 0x2a, 0x6e});
-            SendKey = new RC4(new byte[] {0x72, 0xc5, 0x58, 0x3c, 0xaf, 0xb6, 0x81, 0x89, 0x95, 0xcd, 0xd7, 0x4b, 0x80});
+                new RC4(new byte[] { 0x31, 0x1f, 0x80, 0x69, 0x14, 0x51, 0xc7, 0x1d, 0x09, 0xa1, 0x3a, 0x2a, 0x6e });
+            SendKey = new RC4(new byte[]
+                { 0x72, 0xc5, 0x58, 0x3c, 0xaf, 0xb6, 0x81, 0x89, 0x95, 0xcd, 0xd7, 0x4b, 0x80 });
             BeginProcess();
         }
 
@@ -68,13 +72,21 @@ namespace wServer.networking
 
         public void BeginProcess()
         {
-            log.InfoFormat($"Received client @ {Socket.RemoteEndPoint}.");
+            log?.LogInformation("Received client @ {endPoint}", Socket.RemoteEndPoint);
             handler = new NetworkHandler(this, Socket);
             handler.BeginHandling();
         }
 
         public void SendPacket(Packet pkt)
         {
+            if (Stage == ProtocalStage.Disconnected || Socket == null || !Socket.Connected)
+                return;
+            
+            if (pkt.ID != PacketID.MOVE && pkt.ID != PacketID.NEWTICK)
+            {
+                log?.LogInformation("Sending packet '{packetId}' to {endPoint}", pkt.ID, Socket.RemoteEndPoint);
+            }
+
             handler?.SendPacket(pkt);
         }
 
@@ -90,22 +102,27 @@ namespace wServer.networking
             return Stage != ProtocalStage.Ready || (Player != null && (Player == null || Player.Owner != null));
         }
 
-        internal void ProcessPacket(Packet pkt)
+        internal async Task ProcessPacket(Packet pkt)
         {
             try
             {
-                log.Logger.Log(typeof (Client), Level.Verbose,
-                   $"Handling packet '{pkt}'...", null);
-                if (pkt.ID == (PacketID) 255) return;
+                if (pkt.ID != PacketID.MOVE)
+                {
+                    log?.LogInformation("Handling packet '{packetId}'...", pkt.ID);
+                }
+
+                if (pkt.ID == (PacketID)255) return;
                 IPacketHandler handler;
                 if (!PacketHandlers.Handlers.TryGetValue(pkt.ID, out handler))
-                    log.Warn($"Unhandled packet '{pkt.ID}'.");
+                    log?.LogWarning("Unhandled packet '{packetId}'", pkt.ID);
                 else
-                    handler.Handle(this, (ClientPacket) pkt);
+                {
+                    await handler.Handle(this, (ClientPacket)pkt).ConfigureAwait(false);
+                }
             }
             catch (Exception e)
             {
-                log.Error($"Error when handling packet '{pkt}'...", e);
+                log?.LogError(e, "Error when handling packet '{packetId}'...", pkt.ID);
                 Disconnect();
             }
         }
@@ -116,14 +133,30 @@ namespace wServer.networking
             {
                 if (Stage == ProtocalStage.Disconnected) return;
                 Stage = ProtocalStage.Disconnected;
+
+                handler?.Stop();
+                
+                if (Socket.Connected)
+                {
+                    try
+                    {
+                        Socket.Shutdown(SocketShutdown.Both);
+                    }
+                    catch
+                    {
+                    }
+
+                    Socket.Close();
+                }
+                
+                handler?.Dispose();
+
                 if (Account != null)
                     DisconnectFromRealm();
-
-                Socket.Close();
             }
             catch (Exception e)
             {
-                log.Error(e);
+                log?.LogError(e, "Error during client disconnect");
             }
         }
 
@@ -154,7 +187,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    log.Fatal("SaveException", ex);
+                    log?.LogCritical(ex, "SaveException");
                 }
             });
         }
@@ -162,19 +195,33 @@ namespace wServer.networking
         //Following must execute, network loop will discard disconnected client, so logic loop
         private void DisconnectFromRealm()
         {
-            Manager.Logic.AddPendingAction(t =>
+            Manager.Logic.AddPendingAction(async t =>
             {
-                Save();
-                Manager.Disconnect(this);
+                try
+                {
+                    await Save().ConfigureAwait(false);
+                    await Manager.DisconnectAsync(this).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    log?.LogError(ex, "Error during disconnect from realm");
+                }
             }, PendingPriority.Destruction);
         }
 
         public void Reconnect(ReconnectPacket pkt)
         {
-            Manager.Logic.AddPendingAction(t =>
+            Manager.Logic.AddPendingAsyncAction(async t =>
             {
-                Save();
-                SendPacket(pkt);
+                try
+                {
+                    await Save().ConfigureAwait(false);
+                    SendPacket(pkt);
+                }
+                catch (Exception ex)
+                {
+                    log?.LogError(ex, "Error during reconnect");
+                }
             }, PendingPriority.Destruction);
         }
 
@@ -189,14 +236,14 @@ namespace wServer.networking
                     break;
             }
 
-            AddGiftCode(GiftCode.GenerateRandom(Manager.GameData));
+            AddGiftCode(db.JsonObjects.GiftCode.GenerateRandom(Manager.GameDataService));
         }
 
-        private void AddGiftCode(GiftCode code)
+        private async void AddGiftCode(db.JsonObjects.GiftCode code)
         {
-            Manager.Database.DoActionAsync(db =>
+            await Manager.Database.DoActionAsync(async db =>
             {
-                var key = db.GenerateGiftcode(code.ToJson(), Account.AccountId);
+                var key = await db.GenerateGiftcodeAsync(code.ToJson(), Account.AccountId).ConfigureAwait(false);
 
                 //var message = new MailMessage();
                 //message.To.Add(Account.Email);
@@ -206,8 +253,9 @@ namespace wServer.networking
                 //message.Body = "<center>Your giftcode is: " + code + "</br> Check the items in your giftcode <a href=\"" + Program.Settings.GetValue<string>("serverDomain", "localhost") + "/CheckGiftCode.html\" target=\"_blank\">here</a> or redeem the code <a href=\"" + Program.Settings.GetValue<string>("serverDomain", "localhost") + "/RedeemGiftCode.html\" target=\"_blank\">here</a></center>";
 
                 //Program.SendEmail(message);
-                Player.SendInfo($"You have received a new GiftCode: {key}\nRedeem it at: {Program.Settings.GetValue("serverDomain")}/GiftCode.html or\n type /giftcode to scan it with your mobile via qr code");
-            });
+                Player.SendInfo(
+                    $"You have received a new GiftCode: {key}\nRedeem it at: {Program.Config.Realm.ServerDomain}/GiftCode.html or\n type /giftcode to scan it with your mobile via qr code");
+            }).ConfigureAwait(false);
         }
 
         public void Dispose()

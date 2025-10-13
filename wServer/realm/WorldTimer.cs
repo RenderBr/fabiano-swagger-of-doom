@@ -1,7 +1,10 @@
 ﻿#region
 
-using log4net;
 using System;
+using System.Threading.Tasks;
+using RageRealm.Shared.Models;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -9,11 +12,13 @@ namespace wServer.realm
 {
     public class WorldTimer
     {
-        private static readonly ILog log = LogManager.GetLogger(typeof(WorldTimer));
+        private readonly ILogger<WorldTimer> _logger;
         private readonly Action<World, RealmTime> cb;
+        private readonly Func<World, RealmTime, Task> asyncCb;
         private readonly int total;
         private int remain;
         private bool destroy;
+        private readonly bool isAsync;
 
         public int Remaining { get { return remain; } }
 
@@ -21,6 +26,16 @@ namespace wServer.realm
         {
             remain = total = tickMs;
             cb = callback;
+            isAsync = false;
+            _logger = Program.Services?.GetRequiredService<ILogger<WorldTimer>>();
+        }
+
+        public WorldTimer(int tickMs, Func<World, RealmTime, Task> asyncCallback)
+        {
+            remain = total = tickMs;
+            asyncCb = asyncCallback;
+            isAsync = true;
+            _logger = Program.Services?.GetRequiredService<ILogger<WorldTimer>>();
         }
 
         public void Reset()
@@ -50,11 +65,29 @@ namespace wServer.realm
             {
                 try
                 {
-                    cb(world, time);
+                    if (isAsync)
+                    {
+                        // Fire and forget for async callbacks
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await asyncCb(world, time).ConfigureAwait(false);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger?.LogError(ex, "Error in async WorldTimer callback");
+                            }
+                        });
+                    }
+                    else
+                    {
+                        cb(world, time);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    log.Error(ex);
+                    _logger?.LogError(ex, "Error in WorldTimer callback");
                 }
                 return true;
             }

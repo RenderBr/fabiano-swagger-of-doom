@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
 
 #endregion
@@ -20,7 +21,7 @@ namespace wServer.realm.entities
         private CollisionMap<Entity> collisionMap;
 
         public Projectile(RealmManager manager, ProjectileDesc desc)
-            : base(manager, manager.GameData.IdToObjectType[desc.ObjectId])
+            : base(manager, manager.GameDataService.IdToObjectType[desc.ObjectId])
         {
             Descriptor = desc;
         }
@@ -141,7 +142,7 @@ namespace wServer.realm.entities
 
             ushort objId = Owner.Map[(int)pos.X, (int)pos.Y].ObjType;
             if (objId != 0 &&
-                Manager.GameData.ObjectDescs[objId].OccupySquare &&
+                Manager.GameDataService.ObjectDescs[objId].OccupySquare &&
                 !penetrateObsta)
             {
                 Destroy(true);

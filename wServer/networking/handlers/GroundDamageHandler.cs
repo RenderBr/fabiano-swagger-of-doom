@@ -1,6 +1,10 @@
 ﻿#region
 
 using System;
+using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
 using wServer.realm;
 
@@ -15,7 +19,7 @@ namespace wServer.networking.handlers
             get { return PacketID.GROUNDDAMAGE; }
         }
 
-        protected override void HandlePacket(Client client, GroundDamagePacket packet)
+        protected override Task HandlePacket(Client client, GroundDamagePacket packet)
         {
             client.Manager.Logic.AddPendingAction(t =>
             {
@@ -27,12 +31,15 @@ namespace wServer.networking.handlers
                 {
                     if (client.Player.Owner == null) return;
                     WmapTile tile = client.Player.Owner.Map[(int)packet.Position.X, (int)packet.Position.Y];
-                    ObjectDesc objDesc = tile.ObjType == 0 ? null : client.Manager.GameData.ObjectDescs[tile.ObjType];
-                    TileDesc tileDesc = client.Manager.GameData.Tiles[tile.TileId];
+                    ObjectDesc objDesc = tile.ObjType == 0
+                        ? null
+                        : client.Manager.GameDataService.ObjectDescs[tile.ObjType];
+                    TileDesc tileDesc = client.Manager.GameDataService.Tiles[tile.TileId];
                     if (tileDesc.Damaging && (objDesc == null || !objDesc.ProtectFromGroundDamage))
                     {
-                        int dmg = (int)client.Player.StatsManager.Random.obf6((uint)tileDesc.MinDamage, (uint)tileDesc.MaxDamage);
-                        dmg = (int) client.Player.StatsManager.GetDefenseDamage(dmg, true);
+                        int dmg = (int)client.Player.StatsManager.Random.obf6((uint)tileDesc.MinDamage,
+                            (uint)tileDesc.MaxDamage);
+                        dmg = (int)client.Player.StatsManager.GetDefenseDamage(dmg, true);
 
                         client.Player.HP -= dmg;
                         client.Player.UpdateCount++;
@@ -42,9 +49,11 @@ namespace wServer.networking.handlers
                 }
                 catch (Exception ex)
                 {
-                    log.Error(ex);
+                    Program.Services.GetRequiredService<ILogger<GroundDamageHandler>>()
+                        .LogError(ex, "Error in GroundDamageHandler");
                 }
             }, PendingPriority.Networking);
+            return Task.CompletedTask;
         }
     }
 }

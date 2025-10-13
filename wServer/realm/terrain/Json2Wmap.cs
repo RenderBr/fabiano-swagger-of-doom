@@ -29,7 +29,7 @@ namespace wServer.realm.terrain
                 loc o = obj.dict[i];
                 tileDict[(ushort) i] = new TerrainTile
                 {
-                    TileId = o.ground == null ? (ushort) 0xff : manager.GameData.IdToTileType[o.ground],
+                    TileId = o.ground == null ? (ushort) 0xff : manager.GameDataService.IdToTileType[o.ground],
                     TileObj = o.objs == null ? null : o.objs[0].id,
                     Name = o.objs == null ? "" : o.objs[0].name ?? "",
                     Terrain = TerrainType.None,
@@ -61,7 +61,7 @@ namespace wServer.realm.terrain
                 loc o = obj.dict[i];
                 tileDict[(ushort) i] = new TerrainTile
                 {
-                    TileId = o.ground == null ? (ushort) 0xff : manager.GameData.IdToObjectType[o.ground],
+                    TileId = o.ground == null ? (ushort) 0xff : manager.GameDataService.IdToObjectType[o.ground],
                     TileObj = o.objs == null ? null : o.objs[0].id,
                     Name = o.objs == null ? "" : o.objs[0].name ?? "",
                     Terrain = TerrainType.None,
@@ -119,7 +119,7 @@ namespace wServer.realm.terrain
                 loc o = obj.dict[i];
                 tileDict[(ushort) i] = new TerrainTile
                 {
-                    TileId = o.ground == null ? (ushort) 0xff : manager.GameData.IdToObjectType[o.ground],
+                    TileId = o.ground == null ? (ushort) 0xff : manager.GameDataService.IdToObjectType[o.ground],
                     TileObj = o.objs == null ? null : o.objs[0].id,
                     Name = o.objs == null ? "" : o.objs[0].name ?? "",
                     Terrain = TerrainType.None,
@@ -159,9 +159,9 @@ namespace wServer.realm.terrain
                     if (createWall)
                         tiles[i.X, i.Y].TileObj = rand.Next(1, 5) == 1 ? "Grey Torch Wall" : "Grey Wall";
                 }
-                else if (i.TileId == manager.GameData.IdToObjectType["Grey Closed"] && rand.Next(1, 4) == 1)
+                else if (i.TileId == manager.GameDataService.IdToObjectType["Grey Closed"] && rand.Next(1, 4) == 1)
                 {
-                    tiles[i.X, i.Y].TileId = manager.GameData.IdToObjectType["Grey Quad"];
+                    tiles[i.X, i.Y].TileId = manager.GameDataService.IdToObjectType["Grey Quad"];
                 }
             }
 

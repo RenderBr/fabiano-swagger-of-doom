@@ -3,11 +3,17 @@
 using System;
 using System.Collections.Specialized;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 using System.Web;
 using db;
-using MySql.Data.MySqlClient;
+using db.Models;
+using db.Repositories;
+using db.Services;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 #endregion
 
@@ -15,12 +21,15 @@ namespace server.Arena
 {
     internal class getRecords : RequestHandler
     {
-        protected override void HandleRequest()
+        protected override async Task HandleRequest()
         {
             string result = "";
-            using (Database dbx = new Database())
+            using (var scope = Program.Services.CreateScope())
             {
-                Account acc = dbx.Verify(Query["guid"], Query["password"], Program.GameData);
+                var accountService = scope.ServiceProvider.GetRequiredService<AccountService>();
+                var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+                Account acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
                 if (String.IsNullOrEmpty(Query["guid"]) ||
                     String.IsNullOrEmpty(Query["password"]) ||
                     String.IsNullOrEmpty(Query["type"]) ||
@@ -31,42 +40,19 @@ namespace server.Arena
                 }
                 else
                 {
-                    string[][] ranks = dbx.GetArenaLeaderboards(Query["type"], acc);
+                    // TODO: Implement GetArenaLeaderboards via repository
+                    string[][] ranks = new string[0][]; // Placeholder, need to implement
                     result += "<ArenaRecords>";
                     foreach (string[] i in ranks)
                     {
-                        MySqlCommand cmd = dbx.CreateQuery();
-                        cmd.CommandText =
-                            "SELECT 'skin','tex1','tex2','inventory','class' FROM characters WHERE charid = @charid";
-                        cmd.Parameters.AddWithValue("@charid", i[2]);
-                        string skin, tex1, tex2, inventory, cclass;
-                        skin = tex1 = tex2 = inventory = cclass = null;
-                        using (MySqlDataReader drdr = cmd.ExecuteReader())
-                        {
-                            while (drdr.Read())
-                            {
-                                skin = drdr.GetString("skin");
-                                tex1 = drdr.GetString("tex1");
-                                tex2 = drdr.GetString("tex2");
-                                inventory = drdr.GetString("inventory");
-                                cclass = drdr.GetString("class");
-                            }
-                        }
-                        cmd = dbx.CreateQuery();
-                        cmd.CommandText =
-                            "SELECT 'skin','tex1','tex2','inventory','class' FROM characters WHERE charid = @charid";
-                        cmd.Parameters.AddWithValue("@charid", i[2]);
-                        using (MySqlDataReader drdr = cmd.ExecuteReader())
-                        {
-                            while (drdr.Read())
-                            {
-                                skin = drdr.GetString("skin");
-                                tex1 = drdr.GetString("tex1");
-                                tex2 = drdr.GetString("tex2");
-                                inventory = drdr.GetString("inventory");
-                                cclass = drdr.GetString("class");
-                            }
-                        }
+                        // Get character data
+                        var character = await unitOfWork.Characters.GetByCharacterIdAsync(acc.Id, int.Parse(i[2]));
+                        string skin = character?.Skin.ToString() ?? "0";
+                        string tex1 = character?.Tex1.ToString() ?? "0";
+                        string tex2 = character?.Tex2.ToString() ?? "0";
+                        string inventory = string.Join(",", character?.Items ?? []);
+                        string cclass = character?.CharacterType.ToString() ?? "0";
+
                         result += "<Record>";
                         //wave number
                         result += "<WaveNumber>" + i[0] + "</WaveNumber>";
@@ -74,11 +60,11 @@ namespace server.Arena
                         result += "<Time>" + i[4] + "</Time>";
                         result += "<PlayData>";
                         result += "<CharacterData>";
-                        result += "<GuildName>" + acc.Guild.Name + "</GuildName>";
-                        result += "<GuildRank>" + acc.Guild.Rank + "</GuildRank>";
+                        result += "<GuildName></GuildName>"; // Placeholder
+                        result += "<GuildRank>0</GuildRank>"; // Placeholder
                         result += "<Id>" + i[2] + "</Id>";
                         result += "<Texture>" + skin + "</Texture>";
-                        result += "<Invantory>" + inventory + "</Inventory>";
+                        result += "<Inventory>" + inventory + "</Inventory>";
                         result += "<Name>" + acc.Name + "</Name>";
                         result += "<Class>" + cclass + "</Class>";
                         result += "</CharacterData>";
@@ -96,7 +82,7 @@ namespace server.Arena
                         result += "</PlayData>";
                         result += "</Record>";
                     }
-                    result += "</ArenaRecords";
+                    result += "</ArenaRecords>";
                 }
             }
             byte[] buf = Encoding.UTF8.GetBytes(result);
