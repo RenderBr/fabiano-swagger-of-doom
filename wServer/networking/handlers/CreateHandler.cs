@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using db.Models;
 using db.Repositories;
+using db.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
@@ -63,23 +64,11 @@ namespace wServer.networking.handlers
                     .ToArray();
             int skin = ownedSkins.Contains(packet.SkinType) ? packet.SkinType : 0;
 
-            var newCharacter = new Character
-            {
-                AccountId = long.Parse(client.Account.AccountId),
-                CharacterId = nextCharId,
-                CharacterType = packet.ClassType,
-                Level = 1,
-                Experience = 0,
-                Fame = 0,
-                Items = [2711, 2606, 2652, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1],
-                Hp = 100,
-                Mp = 100,
-                Dead = false,
-                PetItemType = 0,
-                FameStats = "{}",
-                Skin = skin
-            };
-
+            var newCharacter = Program.Services.GetRequiredService<CharacterCreationService>()
+                .Create((ushort)packet.ClassType, nextCharId, skin);
+            
+            newCharacter.AccountId = long.Parse(client.Account.AccountId);
+            
             try
             {
                 await characterRepository.AddAsync(newCharacter);

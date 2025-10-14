@@ -89,7 +89,7 @@ namespace wServer.realm
             var isNew = false;
             if (chr == null)
             {
-                chr = new db.Models.Character
+                chr = new Character
                 {
                     AccountId = accId,
                     CharacterId = character.CharacterId
@@ -106,7 +106,17 @@ namespace wServer.realm
             chr.MpPotions = character.MagicStackCount;
             chr.Hp = character.HitPoints;
             chr.Mp = character.MagicPoints;
-            chr.Stats = new CharacterStats();
+            chr.Stats = new CharacterStats()
+            {
+                Attack = character.Attack,
+                Defense = character.Defense,
+                Speed = character.Speed,
+                Dexterity = character.Dexterity,
+                Vitality = character.HpRegen,
+                Wisdom = character.MpRegen,
+                MaxHitPoints = character.MaxHitPoints,
+                MaxMagicPoints = character.MaxMagicPoints
+            };
             chr.Dead = character.Dead;
             chr.Tex1 = character.Tex1;
             chr.Tex2 = character.Tex2;

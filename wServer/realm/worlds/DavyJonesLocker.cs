@@ -19,7 +19,7 @@ namespace wServer.realm.worlds
             AllowTeleport = true;
         }
 
-        protected override async Task InitAsync()
+        public override async Task InitAsync()
         {
             await LoadMapAsync("wServer.realm.worlds.maps.vault.wmap", MapType.Wmap);
         }

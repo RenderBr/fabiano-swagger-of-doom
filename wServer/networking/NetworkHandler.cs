@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -128,8 +129,7 @@ namespace wServer.networking
                     {
                         packet.Read(parent, buffer, HEADER_SIZE - 1, bodyLen);
 
-                        if (packet.ID != PacketID.PING && packet.ID != PacketID.PONG && packet.ID != PacketID.UPDATE &&
-                            packet.ID != PacketID.MOVE)
+                        if (!Client.ExcludePacketsFromLogging.Contains((PacketID)packetId))
                         {
                             _logger?.LogInformation("Received {packetId} ({packetType}) [{bodyLen} bytes] from {endPoint}",
                                 packetId, packet.GetType().Name, bodyLen, socket.RemoteEndPoint);
@@ -238,8 +238,7 @@ namespace wServer.networking
                         await socket.SendAsync(buffer.AsMemory(0, len), SocketFlags.None, cts.Token)
                             .ConfigureAwait(false);
                         sendLock.Release();
-                        if (packet.ID != PacketID.PING && packet.ID != PacketID.PONG && packet.ID != PacketID.UPDATE &&
-                            packet.ID != PacketID.MOVE)
+                        if (!Client.ExcludePacketsFromLogging.Contains(packet.ID))
                         {
                             _logger?.LogDebug("Sent {packetType} [{len} bytes] to {endPoint}", 
                                 packet.GetType().Name, len, socket.RemoteEndPoint);

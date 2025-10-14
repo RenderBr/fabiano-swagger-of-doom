@@ -80,7 +80,6 @@ internal class Program
                 {
                     builder.AddSimpleConsole(options =>
                     {
-                        options.SingleLine = true;
                         options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
                         options.IncludeScopes = true;
                         options.UseUtcTimestamp = true;
@@ -121,6 +120,7 @@ internal class Program
             serviceBuilder.Configure<RealmConfiguration>(configuration.GetSection("Realm"));
             serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
             serviceBuilder.AddSingleton<RealmManager>();
+            serviceBuilder.AddSingleton<CharacterCreationService>();
 
             Services = serviceBuilder.BuildServiceProvider();
             Logger = Services.GetRequiredService<ILogger<Program>>();

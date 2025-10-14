@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Xml;
@@ -143,9 +144,9 @@ public class Account
     [NotMapped] public string DailyQuest { get; set; } // Need to implement
 
     [NotMapped] public string NextGiftCode { get; set; } // Need to implement
-
-    [NotMapped] public VaultData Vault { get; set; } // Need to implement
-
+    
+    [InverseProperty(nameof(Vault.Account))]
+    public virtual ICollection<Vault> Vaults { get; set; } = new List<Vault>();
     [NotMapped] public string Backpacks { get; set; } // Legacy compatibility
 
     [NotMapped]

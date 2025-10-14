@@ -1,6 +1,8 @@
 ﻿#region
 
 using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 #endregion
 
@@ -42,7 +44,7 @@ namespace wServer.networking.svrPackets
         protected override void Write(Client psr, NWriter wtr)
         {
             wtr.Write(TargetId);
-            List<byte> eff = new List<byte>();
+            var eff = new List<byte>();
             for (byte i = 1; i < 255; i++)
                 if ((Effects & (ConditionEffects) (1 << i)) != 0)
                     eff.Add(i);
@@ -53,6 +55,9 @@ namespace wServer.networking.svrPackets
             wtr.Write(ArmorPierce);
             wtr.Write(BulletId);
             wtr.Write(ObjectId);
+            
+            Program.Services.GetRequiredService<ILogger<DamagePacket>>()
+                .LogInformation("Damage: {TargetID} {Effects} {Damage} {Killed} {ArmorPierce} {BulletID} {ObjectID}", TargetId, Effects, Damage, Killed, ArmorPierce, BulletId, ObjectId);
         }
     }
 }

@@ -1,4 +1,7 @@
-﻿namespace wServer.networking.cliPackets
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace wServer.networking.cliPackets
 {
     public class EnemyHitPacket : ClientPacket
     {
@@ -23,6 +26,9 @@
             BulletId = rdr.ReadByte();
             TargetId = rdr.ReadInt32();
             Killed = rdr.ReadBoolean();
+            
+            Program.Services.GetRequiredService<ILogger<EnemyHitPacket>>()
+                .LogInformation("EnemyHit: {Time} {BulletID} {TargetID} {Killed}", Time, BulletId, TargetId, Killed);
         }
 
         protected override void Write(Client psr, NWriter wtr)

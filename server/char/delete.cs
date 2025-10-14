@@ -25,13 +25,14 @@ namespace server.@char
             var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
             var acc = await accountService.VerifyAsync(Query["guid"], Query["password"]);
-            byte[] status = new byte[0];
+            byte[] status = [];
             if (acc != null)
             {
                 var character = await unitOfWork.Characters.GetByCharacterIdAsync(acc.Id, int.Parse(Query["charId"]));
                 if (character != null)
                 {
                     await unitOfWork.Characters.DeleteAsync(character);
+                    await unitOfWork.SaveChangesAsync();
                     status = Encoding.UTF8.GetBytes("<Success />");
                 }
                 else

@@ -66,8 +66,9 @@ namespace wServer.realm
 
         private ILogger<RealmManager> _logger;
 
-        public RealmManager(ILogger<RealmManager> logger, IOptions<RealmConfiguration> options)
+        public RealmManager(ILogger<RealmManager> logger, IOptions<RealmConfiguration> options, IServiceProvider services)
         {
+            _services = services;
             MaxClients = options.Value.MaxClients;
             TPS = options.Value.Tps;
             _logger = logger;

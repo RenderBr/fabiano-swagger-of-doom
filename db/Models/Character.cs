@@ -55,7 +55,7 @@ public class Character
     public int Mp { get; set; } = 1;
 
     [NotMapped]
-    public CharacterStats Stats { get; set; } = new CharacterStats();
+    public CharacterStats Stats { get; set; } = new();
     
     [Required]
     [Column("stats")]

@@ -172,7 +172,7 @@ namespace wServer.realm
             _ = InitAsync();
         }
 
-        protected virtual async Task InitAsync() => await Task.CompletedTask;
+        public virtual async Task InitAsync() => await Task.CompletedTask;
 
         protected async Task FromWorldMapAsync(Stream dat)
         {

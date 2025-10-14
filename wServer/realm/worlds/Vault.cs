@@ -81,7 +81,11 @@ namespace wServer.realm.worlds
                 (x.X - spawn.X) * (x.X - spawn.X) + (x.Y - spawn.Y) * (x.Y - spawn.Y),
                 (y.X - spawn.X) * (y.X - spawn.X) + (y.Y - spawn.Y) * (y.Y - spawn.Y)));
 
-            List<VaultChest> chests = psr.Account.Vault.Chests;
+            var chests = psr.Account.Vaults.Select(chest => new VaultChest
+            {
+                _Items = chest.Items,
+                ChestId = chest.ChestId
+            }).ToList();
 
             if (psr.Account.Gifts != null)
             {
@@ -261,7 +265,10 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new Vault(false, psr));
+            var vault = new Vault(false, psr);
+            vault.Manager = Manager;
+            vault.Init();
+            return Manager.AddWorld(vault);
         }
 
         public override void Tick(RealmTime time)

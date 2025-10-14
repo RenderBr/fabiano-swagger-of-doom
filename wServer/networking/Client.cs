@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +33,7 @@ namespace wServer.networking
     {
         private bool disposed;
 
-        private static readonly ILogger Log = Program.Services?.GetRequiredService<ILogger<Client>>();
+        private ILogger log;
 
         public uint UpdateAckCount = 0;
 
@@ -40,6 +41,7 @@ namespace wServer.networking
 
         public Client(RealmManager manager, Socket skt)
         {
+            log = Program.Services?.GetRequiredService<ILogger<Client>>();
             Socket = skt;
             Manager = manager;
             ReceiveKey =
@@ -67,10 +69,19 @@ namespace wServer.networking
         public wRandom Random { get; internal set; }
         public string ConnectedBuild { get; internal set; }
         public int TargetWorld { get; internal set; }
+        
+        public static PacketID[] ExcludePacketsFromLogging =
+        [
+            PacketID.NEWTICK,
+            PacketID.UPDATE,
+            PacketID.PING,
+            PacketID.MOVE,
+            PacketID.UPDATEACK,
+        ];
 
         public void BeginProcess()
         {
-            Log?.LogInformation("Received client @ {endPoint}", Socket.RemoteEndPoint);
+            log?.LogInformation("Received client @ {endPoint}", Socket.RemoteEndPoint);
             handler = new NetworkHandler(this, Socket);
             handler.BeginHandling();
         }
@@ -80,9 +91,9 @@ namespace wServer.networking
             if (Stage == ProtocalStage.Disconnected || Socket == null || !Socket.Connected)
                 return;
 
-            if (pkt.ID != PacketID.MOVE && pkt.ID != PacketID.NEWTICK)
+            if (!ExcludePacketsFromLogging.Contains(pkt.ID))
             {
-                Log?.LogInformation("Sending packet '{packetId}' to {endPoint}", pkt.ID, Socket.RemoteEndPoint);
+                log?.LogInformation("Sending packet '{packetId}' to {endPoint}", pkt.ID, Socket.RemoteEndPoint);
             }
 
             handler?.SendPacket(pkt);
@@ -104,15 +115,15 @@ namespace wServer.networking
         {
             try
             {
-                if (pkt.ID != PacketID.MOVE)
+                if (!ExcludePacketsFromLogging.Contains(pkt.ID))
                 {
-                    Log?.LogInformation("Handling packet '{packetId}'...", pkt.ID);
+                    log?.LogInformation("Handling packet '{packetId}'...", pkt.ID);
                 }
 
                 if (pkt.ID == (PacketID)255) return;
                 IPacketHandler handler;
                 if (!PacketHandlers.Handlers.TryGetValue(pkt.ID, out handler))
-                    Log?.LogWarning("Unhandled packet '{packetId}'", pkt.ID);
+                    log?.LogWarning("Unhandled packet '{packetId}'", pkt.ID);
                 else
                 {
                     await handler.Handle(this, (ClientPacket)pkt).ConfigureAwait(false);
@@ -120,43 +131,69 @@ namespace wServer.networking
             }
             catch (Exception e)
             {
-                Log?.LogError(e, "Error when handling packet '{packetId}'...", pkt.ID);
-                Disconnect();
+                log?.LogError(e, "Error when handling packet '{packetId}'...", pkt.ID);
             }
+        }
+        
+        public void DisconnectFromRealm()
+        {
+            if (Stage == ProtocalStage.Disconnected) return;
+            Stage = ProtocalStage.Disconnected;
+
+            Manager.Logic.AddPendingAsyncAction(async t =>
+            {
+                try
+                {
+                    await Save().ConfigureAwait(false);
+                    await Manager.DisconnectAsync(this).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    log?.LogError(ex, "Error during soft disconnect from realm");
+                }
+            }, PendingPriority.Destruction);
         }
 
         public void Disconnect()
         {
-            try
+            if (Stage == ProtocalStage.Disconnected) return;
+            Stage = ProtocalStage.Disconnected;
+
+            handler?.Stop();
+
+            // initiate async realm disconnect and wait for completion BEFORE disposing
+            Manager.Logic.AddPendingAsyncAction(async t =>
             {
-                if (Stage == ProtocalStage.Disconnected) return;
-                Stage = ProtocalStage.Disconnected;
-
-                handler?.Stop();
-
-                if (Socket.Connected)
+                try
                 {
+                    await Save().ConfigureAwait(false);
+                    await Manager.DisconnectAsync(this).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    log?.LogError(ex, "Error during hard disconnect from realm");
+                }
+                finally
+                {
+                    // now that logic thread is done using us, we can clean up
                     try
                     {
-                        Socket.Shutdown(SocketShutdown.Both);
+                        if (Socket?.Connected == true)
+                        {
+                            try { Socket.Shutdown(SocketShutdown.Both); } catch { }
+                            Socket.Close();
+                        }
+
+                        Dispose();
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        log?.LogError(ex, "Error while disposing after disconnect");
                     }
-
-                    Socket.Close();
                 }
-
-                handler?.Dispose();
-
-                if (Account != null)
-                    DisconnectFromRealm();
-            }
-            catch (Exception e)
-            {
-                Log?.LogError(e, "Error during client disconnect");
-            }
+            }, PendingPriority.Destruction);
         }
+
 
         public Task Save()
         {
@@ -185,26 +222,9 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    Log?.LogCritical(ex, "SaveException");
+                    log?.LogCritical(ex, "SaveException");
                 }
             });
-        }
-
-        //Following must execute, network loop will discard disconnected client, so logic loop
-        private void DisconnectFromRealm()
-        {
-            Manager.Logic.AddPendingAction(async t =>
-            {
-                try
-                {
-                    await Save().ConfigureAwait(false);
-                    await Manager.DisconnectAsync(this).ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    Log?.LogError(ex, "Error during disconnect from realm");
-                }
-            }, PendingPriority.Destruction);
         }
 
         public void Reconnect(ReconnectPacket pkt)
@@ -218,7 +238,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    Log?.LogError(ex, "Error during reconnect");
+                    log?.LogError(ex, "Error during reconnect");
                 }
             }, PendingPriority.Destruction);
         }

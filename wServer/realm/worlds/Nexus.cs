@@ -27,7 +27,7 @@ namespace wServer.realm.worlds
             Difficulty = -1;
         }
         
-        protected override async Task InitAsync()
+        public override async Task InitAsync()
         {
             await LoadMapAsync(SUMMER_RESOURCE, MapType.Json);
         }

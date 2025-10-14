@@ -41,9 +41,13 @@ public class AccountUtilities
                 Fame = 0,
                 TotalFame = 0
             },
-            Vault = new VaultData
+            Vaults = new List<Vault>()
             {
-                Chests = new List<VaultChest>()
+                new Vault()
+                {
+                    Items = "[]",
+                    ChestType = 0
+                }
             },
             Gifts = "",
             OwnedSkins = "",

@@ -153,7 +153,7 @@ namespace wServer.realm.entities
                     Killed = HP < 0,
                     BulletId = projectile.ProjectileId,
                     ObjectId = projectile.ProjectileOwner.Self.Id
-                }, HP < 0 && !IsOneHit(dmg, prevHp) ? null : projectile.ProjectileOwner as Player);
+                }, null);
 
                 counter.HitBy(projectile.ProjectileOwner as Player, time, projectile, dmg);
 

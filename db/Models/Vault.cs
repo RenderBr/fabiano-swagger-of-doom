@@ -14,6 +14,9 @@ public class Vault
     [Column("accId")]
     public long AccountId { get; set; }
 
+    [ForeignKey(nameof(AccountId))]
+    public virtual Account Account { get; set; }
+    
     [Required]
     [Column("chestId")]
     public int ChestId { get; set; }
@@ -25,8 +28,4 @@ public class Vault
     [Required]
     [Column("chestType")]
     public byte ChestType { get; set; } = 0;
-
-    // Navigation property
-    [ForeignKey("AccountId")]
-    public virtual Account Account { get; set; }
 }

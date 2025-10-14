@@ -37,7 +37,14 @@ public class AccountXml
         this.Banned = account.Banned ? "True" : string.Empty;
         this.VerifiedEmail = account.Verified ? "True" : string.Empty;
         this.Converted = string.Empty;
-        this.Vault = account.Vault;
+        this.Vault = new VaultData()
+        {
+            Chests = account.Vaults?.Select(v => new VaultChest()
+            {
+                ChestId = v.ChestId,
+                Items = Utils.FromCommaSepString32(v.Items),
+            }).ToList()
+        };
         this.Guild = account.GuildObj;
         this.Gifts = Utils.GetCommaSepString(Array.Empty<int>());
         this.PetYardType = account.PetYardType;
