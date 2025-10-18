@@ -1,8 +1,10 @@
-﻿namespace wServer.realm.worlds
+﻿using System.Threading.Tasks;
+
+namespace wServer.realm.worlds
 {
     public class MadLab : World
     {
-        public MadLab()
+        public MadLab(RealmManager manager) : base(manager)
         {
             Name = "Mad Lab";
             ClientWorldName = "dungeons.Mad_Lab";
@@ -11,9 +13,9 @@
             AllowTeleport = true;
         }
 
-        protected override void Init()
+        public override async Task InitAsync()
         {
-            LoadMap(GeneratorCache.NextLab(Seed));
+            await LoadMapAsync(GeneratorCache.NextLab(Seed));
         }
     }
 }

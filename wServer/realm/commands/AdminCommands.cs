@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using RageRealm.Shared.Models;
 using wServer.networking;
 using wServer.networking.svrPackets;
+using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.setpieces;
 using wServer.realm.worlds;
@@ -125,12 +126,55 @@ namespace wServer.realm.commands
 
         protected override Task<bool> Process(Player player, RealmTime time, string[] args)
         {
-            Task.Factory.StartNew(async () => await GameWorld.AutoNameAsync(player.WorldInstance.Manager, 1, true))
+            Task.Factory.StartNew(async () => await GameWorld.AutoNameAsync( 1, true))
                 .ContinueWith(_ => player.Manager.AddWorld(_.Result.Result), TaskScheduler.Default);
             return Task.FromResult(true);
         }
     }
 
+    internal class PortalCommand : Command
+    {
+        public PortalCommand()
+            : base("portal", 1)
+        {
+        }
+
+        protected override Task<bool> Process(Player player, RealmTime time, string[] args)
+        {
+            var scope = Program.Services.CreateScope();
+            var realmManager = scope.ServiceProvider.GetRequiredService<RealmManager>();
+            
+            if(args.Length == 0)
+            {
+                player.SendHelp("Usage: /portal <worldname>");
+                return Task.FromResult(false);
+            }
+            
+            string name = string.Join(" ", args.ToArray()).Trim();
+
+            Portal portalEntity;
+            try
+            {
+                portalEntity = Entity.Resolve(realmManager, name) as Portal;
+            }catch(Exception)
+            {
+                player.SendError("Unknown portal!");
+                return Task.FromResult(false);
+            }
+            
+            if (portalEntity == null)
+            {
+                player.SendError("Unknown portal!");
+                return Task.FromResult(false);
+            }
+            
+            portalEntity.Move(player.X, player.Y);
+            player.Owner.EnterWorld(portalEntity);
+
+            player.SendInfo("Success!");
+            return Task.FromResult(true);
+        }
+    }
 
     internal class SpawnCommand : Command
     {

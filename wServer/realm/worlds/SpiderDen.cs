@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class SpiderDen : World
     {
-        public SpiderDen()
+        public SpiderDen(RealmManager manager) : base(manager)
         {
             Name = "Spider Den";
             ClientWorldName = "dungeons.Spider_Den";

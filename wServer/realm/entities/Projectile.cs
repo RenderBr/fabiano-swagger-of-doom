@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
 
@@ -81,40 +82,43 @@ namespace wServer.realm.entities
                     if (dist > d)
                         dist = d - (dist - d);
                 }
+
                 x += dist * Math.Cos(Angle);
                 y += dist * Math.Sin(Angle);
                 if (Descriptor.Amplitude != 0)
                 {
                     double d = Descriptor.Amplitude *
                                Math.Sin(period +
-                                        (double)elapsedTicks / Descriptor.LifetimeMS * Descriptor.Frequency * 2 * Math.PI);
+                                        (double)elapsedTicks / Descriptor.LifetimeMS * Descriptor.Frequency * 2 *
+                                        Math.PI);
                     x += d * Math.Cos(Angle + Math.PI / 2);
                     y += d * Math.Sin(Angle + Math.PI / 2);
                 }
             }
+
             return new Position { X = (float)x, Y = (float)y };
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
-            if (collisionMap == null)
-                collisionMap = ProjectileOwner is Player
-                    ? Owner.EnemiesCollision
-                    : Owner.PlayersCollision;
+            collisionMap ??= ProjectileOwner is Player
+                ? Owner.EnemiesCollision
+                : Owner.PlayersCollision;
 
-            long elapsedTicks = time.tickTimes - BeginTime;
+            var elapsedTicks = time.tickTimes - BeginTime;
             if (elapsedTicks > Descriptor.LifetimeMS)
             {
                 Destroy(true);
-                return;
+                return Task.CompletedTask;
             }
+
             long counter = time.thisTickTimes;
             while (counter > Manager.Logic.MsPT && TickCore(elapsedTicks - counter, time))
                 counter -= Manager.Logic.MsPT;
             if (Owner != null)
                 TickCore(elapsedTicks, time);
 
-            base.Tick(time);
+            return base.Tick(time);
         }
 
         private bool TickCore(long elapsedTicks, RealmTime time)
@@ -127,16 +131,19 @@ namespace wServer.realm.entities
                 Destroy(true);
                 return false;
             }
+
             if (pos.Y < 0 || pos.Y > Owner.Map.Height)
             {
                 Destroy(true);
                 return false;
             }
+
             if (Owner.Map[(int)pos.X, (int)pos.Y].TileId == 0xff)
             {
                 Destroy(true);
                 return false;
             }
+
             bool penetrateObsta = Descriptor.PassesCover;
             bool penetrateEnemy = Descriptor.MultiHit;
 
@@ -148,6 +155,7 @@ namespace wServer.realm.entities
                 Destroy(true);
                 return false;
             }
+
             return true;
         }
 

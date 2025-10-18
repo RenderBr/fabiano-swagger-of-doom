@@ -5,6 +5,7 @@ using db.Models;
 using db.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Generic;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace wServer.realm
@@ -12,11 +13,13 @@ namespace wServer.realm
     // Repository-based adapter for legacy Database calls
     public class DatabaseAdapter : IDisposable
     {
-        private readonly IServiceProvider _services;
+        private readonly IUnitOfWork unitOfWork;
+        private readonly ILogger<DatabaseAdapter> logger;
 
-        public DatabaseAdapter(IServiceProvider services)
+        public DatabaseAdapter(IUnitOfWork unitOfWork, ILogger<DatabaseAdapter> logger)
         {
-            _services = services;
+            this.logger = logger;
+            this.unitOfWork = unitOfWork;
         }
 
         // Execute legacy action pattern (sync or async) in a unified way
@@ -33,19 +36,16 @@ namespace wServer.realm
 
         public async Task<int> UpdateCreditAsync(Account account, int delta)
         {
-            using var scope = _services.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
-            var stats = await uow.Stats.GetByAccountIdAsync(account.Id).ConfigureAwait(false);
+            var stats = await unitOfWork.Stats.GetByAccountIdAsync(account.Id).ConfigureAwait(false);
             if (stats == null)
             {
                 stats = new Stat { AccountId = account.Id, Credits = 0 };
-                await uow.Stats.AddAsync(stats).ConfigureAwait(false);
+                await unitOfWork.Stats.AddAsync(stats).ConfigureAwait(false);
             }
 
             stats.Credits += delta;
-            await uow.Stats.UpdateAsync(stats).ConfigureAwait(false);
-            await uow.SaveChangesAsync().ConfigureAwait(false);
+            await unitOfWork.Stats.UpdateAsync(stats).ConfigureAwait(false);
+            await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
 
             // Update account's cached credits value
             account.Credits = stats.Credits;
@@ -60,17 +60,15 @@ namespace wServer.realm
 
         public async Task UpdateLastSeenAsync(string accountId, int characterId, string worldName)
         {
-            using var scope = _services.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             if (!long.TryParse(accountId, out var accId)) return;
 
-            var chr = await uow.Characters.GetByCharacterIdAsync(accId, characterId).ConfigureAwait(false);
+            var chr = await unitOfWork.Characters.GetByCharacterIdAsync(accId, characterId).ConfigureAwait(false);
             if (chr == null) return;
 
             chr.LastSeen = DateTime.Now;
             chr.LastLocation = worldName ?? string.Empty;
-            await uow.Characters.UpdateAsync(chr).ConfigureAwait(false);
-            await uow.SaveChangesAsync().ConfigureAwait(false);
+            await unitOfWork.Characters.UpdateAsync(chr).ConfigureAwait(false);
+            await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
         }
 
         // Legacy sync wrapper for compatibility
@@ -81,11 +79,9 @@ namespace wServer.realm
 
         public async Task SaveCharacterAsync(Account account, Char character)
         {
-            using var scope = _services.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             if (!long.TryParse(account.AccountId, out var accId)) return;
 
-            var chr = await uow.Characters.GetByCharacterIdAsync(accId, character.CharacterId).ConfigureAwait(false);
+            var chr = await unitOfWork.Characters.GetByCharacterIdAsync(accId, character.CharacterId).ConfigureAwait(false);
             var isNew = false;
             if (chr == null)
             {
@@ -121,7 +117,7 @@ namespace wServer.realm
             chr.Tex1 = character.Tex1;
             chr.Tex2 = character.Tex2;
             chr.PetItemType = character.Pet?.ItemType ?? 0;
-            
+
             if (character.Pet != null)
             {
                 chr.Pet = new Pet()
@@ -144,16 +140,16 @@ namespace wServer.realm
             chr.XpBoosterTime = character.XpTimer;
             chr.LdTimer = character.LDTimer;
             chr.LtTimer = character.LTTimer;
-            chr.FameStats = JsonConvert.SerializeObject(character.FameStats ?? new FameStats()); 
+            chr.FameStats = JsonConvert.SerializeObject(character.FameStats ?? new FameStats());
             chr.TotalFame = Math.Max(chr.TotalFame, character.CurrentFame);
             chr.LastSeen = DateTime.Now;
 
             if (isNew)
-                await uow.Characters.AddAsync(chr).ConfigureAwait(false);
+                await unitOfWork.Characters.AddAsync(chr).ConfigureAwait(false);
             else
-                await uow.Characters.UpdateAsync(chr).ConfigureAwait(false);
+                await unitOfWork.Characters.UpdateAsync(chr).ConfigureAwait(false);
 
-            await uow.SaveChangesAsync().ConfigureAwait(false);
+            await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
         }
 
         // Legacy sync wrapper for compatibility
@@ -164,14 +160,19 @@ namespace wServer.realm
 
         public async Task UnlockAccountAsync(Account account)
         {
-            using var scope = _services.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-            var acc = await uow.Accounts.GetByIdAsync((int)account.Id).ConfigureAwait(false);
+            if (account == null)
+            {
+                logger
+                    .LogWarning("UnlockAccountAsync called with null account or account.Id");
+                return;
+            }
+
+            var acc = await unitOfWork.Accounts.GetByIdAsync((int)account.Id).ConfigureAwait(false);
             if (acc == null) return;
 
             acc.AccountInUse = false;
-            uow.Accounts.Update(acc);
-            await uow.SaveChangesAsync().ConfigureAwait(false);
+            unitOfWork.Accounts.Update(acc);
+            await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
         }
 
         // Legacy sync wrapper for compatibility
@@ -182,11 +183,9 @@ namespace wServer.realm
 
         public async Task SaveChestAsync(string accountId, VaultChest chest)
         {
-            using var scope = _services.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             if (!long.TryParse(accountId, out var accId)) return;
 
-            var v = await uow.Vaults.GetByChestIdAsync(accId, chest.ChestId).ConfigureAwait(false);
+            var v = await unitOfWork.Vaults.GetByChestIdAsync(accId, chest.ChestId).ConfigureAwait(false);
             if (v == null)
             {
                 v = new db.Models.Vault
@@ -196,15 +195,15 @@ namespace wServer.realm
                     Items = chest._Items ?? string.Empty,
                     ChestType = 0
                 };
-                await uow.Vaults.AddAsync(v).ConfigureAwait(false);
+                await unitOfWork.Vaults.AddAsync(v).ConfigureAwait(false);
             }
             else
             {
                 v.Items = chest._Items ?? string.Empty;
-                await uow.Vaults.UpdateAsync(v).ConfigureAwait(false);
+                await unitOfWork.Vaults.UpdateAsync(v).ConfigureAwait(false);
             }
 
-            await uow.SaveChangesAsync().ConfigureAwait(false);
+            await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
         }
 
         // Legacy sync wrapper for compatibility
@@ -215,8 +214,6 @@ namespace wServer.realm
 
         public async Task<string> GenerateGiftcodeAsync(string contentJson, string accountId)
         {
-            using var scope = _services.CreateScope();
-            var uow = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
             var code = Utils.GenerateRandomString(10);
             var gift = new GiftCode
             {
@@ -226,8 +223,8 @@ namespace wServer.realm
                 CreatedAt = DateTime.UtcNow,
                 RedeemedAt = null
             };
-            await uow.GiftCodes.AddAsync(gift).ConfigureAwait(false);
-            await uow.SaveChangesAsync().ConfigureAwait(false);
+            await unitOfWork.GiftCodes.AddAsync(gift).ConfigureAwait(false);
+            await unitOfWork.SaveChangesAsync().ConfigureAwait(false);
             return code;
         }
 
@@ -239,9 +236,6 @@ namespace wServer.realm
 
         public async Task CreateChest(Account account)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             var vault = new db.Models.Vault
             {
                 AccountId = account.Id, // Use Id instead of AccountId
@@ -254,25 +248,16 @@ namespace wServer.realm
 
         public async Task<GuildEntity> GetGuild(int guildId)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             return await unitOfWork.Guilds.GetByIdAsync(guildId).ConfigureAwait(false);
         }
 
         public async Task<GuildEntity> GetGuild(string name)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             return await unitOfWork.Guilds.GetByNameAsync(name).ConfigureAwait(false);
         }
 
         public async Task<GuildEntity> CreateGuild(string name, Account account)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             var guild = new GuildEntity
             {
                 Name = name,
@@ -288,9 +273,6 @@ namespace wServer.realm
 
         public async Task ChangeGuild(Account account, GuildEntity guild, bool remove = false, int rank = 0)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             if (remove)
             {
                 account.GuildId = 0;
@@ -309,9 +291,6 @@ namespace wServer.realm
         // Legacy compatibility signature used across handlers - converted to async
         public async Task<GuildEntity> ChangeGuildAsync(Account account, int guildId, int rank, int fame, bool remove)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             GuildEntity guild = null;
             if (!remove)
             {
@@ -342,17 +321,11 @@ namespace wServer.realm
 
         public async Task<Account> GetAccount(int accountId)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             return await unitOfWork.Accounts.GetByIdAsync(accountId).ConfigureAwait(false);
         }
 
         public async Task<Account> GetAccountByName(string name)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             return await unitOfWork.Accounts.FirstOrDefaultAsync(a => a.Name == name).ConfigureAwait(false);
         }
 
@@ -366,9 +339,6 @@ namespace wServer.realm
 
         public async Task UpdateFameAsync(Account account, int fame)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             account.Fame += fame;
             account.TotalFame += fame;
 
@@ -378,9 +348,6 @@ namespace wServer.realm
 
         public async Task UpdateFortuneTokenAsync(Account account, int tokens)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             account.FortuneTokens += tokens;
 
             unitOfWork.Accounts.Update(account);
@@ -390,17 +357,11 @@ namespace wServer.realm
 
         public async Task<Pet> GetPet(int petId)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             return await unitOfWork.Pets.GetByIdAsync(petId).ConfigureAwait(false);
         }
 
         public async Task<Pet> CreatePet(Account account, int petType)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             var pet = new Pet
             {
                 AccountId = account.Id,
@@ -435,9 +396,6 @@ namespace wServer.realm
 
         public async Task<int> GetNextPetId()
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             // TODO: implement based on repository once available. For now, try max + 1.
             var pets = await unitOfWork.Pets.GetAllAsync().ConfigureAwait(false);
             var max = pets.Any() ? pets.Max(p => (int)p.PetId) : 0;
@@ -446,9 +404,6 @@ namespace wServer.realm
 
         public async Task SaveBackpacks(Account account, string backpacks)
         {
-            using var scope = _services.CreateScope();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
-
             account.Backpacks = backpacks;
 
             unitOfWork.Accounts.Update(account);

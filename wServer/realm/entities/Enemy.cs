@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.logic;
 using wServer.networking.svrPackets;
@@ -39,7 +40,7 @@ namespace wServer.realm.entities
 
         public Position SpawnPoint
         {
-            get { return pos ?? new Position {X = X, Y = Y}; }
+            get { return pos ?? new Position { X = X, Y = Y }; }
         }
 
         protected override void ExportStats(IDictionary<StatsType, object> stats)
@@ -84,7 +85,7 @@ namespace wServer.realm.entities
                 int def = ObjectDesc.Defense;
                 if (noDef)
                     def = 0;
-                dmg = (int) StatsManager.GetDefenseDamage(this, dmg, def);
+                dmg = (int)StatsManager.GetDefenseDamage(this, dmg, def);
                 int effDmg = dmg;
                 if (effDmg > HP)
                     effDmg = HP;
@@ -126,6 +127,7 @@ namespace wServer.realm.entities
                 UpdateCount++;
                 return effDmg;
             }
+
             return 0;
         }
 
@@ -139,17 +141,21 @@ namespace wServer.realm.entities
                 !HasConditionEffect(ConditionEffectIndex.Stasis))
             {
                 var prevHp = HP;
-                var dmg = (int)StatsManager.GetDefenseDamage(this, projectile.Damage, projectile.Descriptor.ArmorPiercing ? 0 : ObjectDesc.Defense);
+                var dmg = (int)StatsManager.GetDefenseDamage(this, projectile.Damage,
+                    projectile.Descriptor.ArmorPiercing ? 0 : ObjectDesc.Defense);
                 if (!HasConditionEffect(ConditionEffectIndex.Invulnerable))
                     HP -= dmg;
-                foreach (ConditionEffect effect in projectile.Descriptor.Effects.Where(effect => (effect.Effect != ConditionEffectIndex.Stunned || !ObjectDesc.StunImmune) && (effect.Effect != ConditionEffectIndex.Paralyzed || !ObjectDesc.ParalyzedImmune) && (effect.Effect != ConditionEffectIndex.Dazed || !ObjectDesc.DazedImmune)))
+                foreach (ConditionEffect effect in projectile.Descriptor.Effects.Where(effect =>
+                             (effect.Effect != ConditionEffectIndex.Stunned || !ObjectDesc.StunImmune) &&
+                             (effect.Effect != ConditionEffectIndex.Paralyzed || !ObjectDesc.ParalyzedImmune) &&
+                             (effect.Effect != ConditionEffectIndex.Dazed || !ObjectDesc.DazedImmune)))
                     ApplyConditionEffect(effect);
 
                 Owner.BroadcastPacket(new DamagePacket
                 {
                     TargetId = Id,
                     Effects = projectile.ConditionEffects,
-                    Damage = (ushort) dmg,
+                    Damage = (ushort)dmg,
                     Killed = HP < 0,
                     BulletId = projectile.ProjectileId,
                     ObjectId = projectile.ProjectileOwner.Self.Id
@@ -161,28 +167,31 @@ namespace wServer.realm.entities
                 {
                     Death(time);
                 }
+
                 UpdateCount++;
                 return true;
             }
+
             return false;
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
-            if (pos == null)
-                pos = new Position {X = X, Y = Y};
+            pos ??= new Position { X = X, Y = Y };
 
             if (!stat && HasConditionEffect(ConditionEffectIndex.Bleeding))
             {
                 if (bleeding > 1)
                 {
-                    HP -= (int) bleeding;
-                    bleeding -= (int) bleeding;
+                    HP -= (int)bleeding;
+                    bleeding -= (int)bleeding;
                     UpdateCount++;
                 }
-                bleeding += 28*(time.thisTickTimes/1000f);
+
+                bleeding += 28 * (time.thisTickTimes / 1000f);
             }
-            base.Tick(time);
+
+            return base.Tick(time);
         }
 
         public override void Dispose()

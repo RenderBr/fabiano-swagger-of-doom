@@ -16,7 +16,7 @@ namespace wServer.realm.worlds
     {
         private readonly Player player;
 
-        public PetYard(Player player)
+        public PetYard(Player player, RealmManager manager = null) : base(manager ?? player.Manager)
         {
             this.player = player;
             Name = "Pet Yard";

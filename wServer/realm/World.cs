@@ -46,12 +46,17 @@ namespace wServer.realm
         protected readonly ILogger<World> _logger;
 
         private int _entityInc;
-        private RealmManager _manager;
+        protected RealmPortalMonitor _portalMonitor;
         private bool _canBeClosed;
+        public RealmManager Manager { get; internal set; }
 
-        protected World()
+        protected World(RealmManager manager)
         {
-            _logger = Program.Services?.GetRequiredService<ILogger<World>>();
+            var scope = Program.Services.CreateScope();
+            Manager = manager;
+            _logger = scope.ServiceProvider.GetRequiredService<ILogger<World>>();
+            _portalMonitor = scope.ServiceProvider.GetService<RealmPortalMonitor>();
+            
             Players = new ConcurrentDictionary<int, Player>();
             Enemies = new ConcurrentDictionary<int, Enemy>();
             Quests = new ConcurrentDictionary<int, Enemy>();
@@ -74,19 +79,6 @@ namespace wServer.realm
         }
 
         public bool IsLimbo { get; protected set; }
-
-        public RealmManager Manager
-        {
-            get => _manager;
-            internal set
-            {
-                _manager = value;
-                if (_manager == null) return;
-                Seed = _manager.Random.NextUInt32();
-                PortalKey = Utils.RandomBytes(NeedsPortalKey ? 16 : 0);
-                Init(); // for async subclass, this calls InitAsync via GameWorld
-            }
-        }
 
         public IEnumerable<Entity> Entities
         {
@@ -387,7 +379,10 @@ namespace wServer.realm
                     }
                 }
 
-                foreach (var p in Players.Values) p.Tick(time);
+                foreach (var p in Players.Values)
+                {
+                    p?.Tick(time);
+                }
                 foreach (var pet in Pets.Values) pet.Tick(time);
 
                 if (EnemiesCollision != null)

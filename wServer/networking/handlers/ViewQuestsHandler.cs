@@ -30,6 +30,7 @@ namespace wServer.networking.handlers
                     await unitOfWork.DailyQuests.AddAsync(dailyQuest);
                     await unitOfWork.SaveChangesAsync();
                 }
+
                 client.Player.DailyQuest = new QuestItem
                 {
                     Tier = dailyQuest.Tier,
@@ -40,32 +41,18 @@ namespace wServer.networking.handlers
 
                 if (client.Player.DailyQuest.Tier == -1)
                 {
-                    client.SendPacket(AllQuestsCompleted());
+                    // All quests completed
                     client.Player.SendInfo("No available quests found.");
-                    return;
                 }
 
                 client.SendPacket(new QuestFetchResponsePacket
                 {
-                    Description = client.Player.DailyQuest.Description,
-                    Goal = client.Player.DailyQuest.Goal,
-                    Tier = client.Player.DailyQuest.Tier,
-                    Image = client.Player.DailyQuest.Image
+                    Quests = [],
+                    NextRefreshPieces = 1
                 });
                 //1 token image: http://rotmg.kabamcdn.com/DailyQuest1FortuneToken.png
                 //2 token image: http://rotmg.kabamcdn.com/DailyQuest2FortuneToken.png
             }
-        }
-
-        public QuestFetchResponsePacket AllQuestsCompleted()
-        {
-            return new QuestFetchResponsePacket
-            {
-                Description = "",
-                Goal = "",
-                Tier = -1,
-                Image = ""
-            };
         }
     }
 }

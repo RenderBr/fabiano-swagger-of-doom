@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using RageRealm.Shared.Models;
 
@@ -38,7 +39,7 @@ namespace wServer.realm.entities
             base.ExportStats(stats);
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
             bool hasItem = false;
             foreach (Item i in Inventory)
@@ -56,7 +57,7 @@ namespace wServer.realm.entities
                 Owner.LeaveWorld(this);
                 w.EnterWorld(obj);
             }
-            base.Tick(time);
+            return base.Tick(time);
         }
 
         public override bool HitByProjectile(Projectile projectile, RealmTime time)

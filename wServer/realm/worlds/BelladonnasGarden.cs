@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class BelladonnasGarden : World
     {
-        public BelladonnasGarden()
+        public BelladonnasGarden(RealmManager manager) : base(manager)
         {
             Name = "Belladonna's Garden";
             ClientWorldName = "dungeons.BelladonnaAPOSs_Garden";

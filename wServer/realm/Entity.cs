@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using RageRealm.Shared.Models;
@@ -266,9 +267,9 @@ namespace wServer.realm
             }
         }
 
-        public virtual void Tick(RealmTime time)
+        public virtual Task Tick(RealmTime time)
         {
-            if (this is Projectile || Owner == null) return;
+            if (this is Projectile || Owner == null) return Task.CompletedTask;
             if (playerOwner != null)
             {
                 if (this.Dist(playerOwner) > 20) Move(playerOwner.X, playerOwner.Y);
@@ -280,8 +281,10 @@ namespace wServer.realm
             }
             if (posHistory != null)
                 posHistory[posIdx++] = new Position { X = X, Y = Y };
-            if (effects == null) return;
+            if (effects == null) return Task.CompletedTask;
             ProcessConditionEffects(time);
+            
+            return Task.CompletedTask;
         }
 
         public Position? TryGetHistory(long timeAgo)

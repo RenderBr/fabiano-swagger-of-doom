@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class LairofShaitan : World
     {
-        public LairofShaitan()
+        public LairofShaitan(RealmManager manager) : base(manager)
         {
             Name = "Lair of Shaitan";
             ClientWorldName = "dungeons.Lair_of_Shaitan";
@@ -23,7 +23,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new LairofShaitan());
+            return Manager.AddWorld(new LairofShaitan(Manager));
         }
     }
 }

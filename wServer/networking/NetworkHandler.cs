@@ -50,18 +50,28 @@ namespace wServer.networking
         {
             try
             {
-                cts?.Cancel(); // cancel send/receive loops
-                socket?.Close();
+                if (!parent.Reconnecting)
+                {
+                    _logger?.LogInformation("Stopping network handler for {0}", parent?.Account?.Name);
+                    cts.Cancel(); // only cancel for *real* disconnects
+                    socket?.Shutdown(SocketShutdown.Both);
+                    socket?.Close();
+                }
+                else
+                {
+                    _logger?.LogInformation("Skipping socket cancel for reconnecting client {0}",
+                        parent?.Account?.Name);
+                }
             }
-            catch
+            catch (Exception ex)
             {
+                _logger?.LogError(ex, "Error while stopping network handler");
             }
 
-            // prevent further sends
             _isRunning = false;
-
             sendQueue.Clear();
         }
+
 
         private async Task ReceiveLoop()
         {
@@ -95,12 +105,12 @@ namespace wServer.networking
                     var packetId = buffer[4];
 
                     int bodyLen = totalLen - HEADER_SIZE;
-                    _logger?.LogDebug("Header => totalLen={bodyLen}, packetId={packetId}, available={available}", 
+                    _logger?.LogDebug("Header => totalLen={bodyLen}, packetId={packetId}, available={available}",
                         bodyLen, packetId, socket.Available);
 
                     if (bodyLen is < 0 or > BUFFER_SIZE)
                     {
-                        _logger?.LogError("Invalid packet length {bodyLen} from {endPoint}", 
+                        _logger?.LogError("Invalid packet length {bodyLen} from {endPoint}",
                             bodyLen, socket.RemoteEndPoint);
                         break;
                     }
@@ -112,7 +122,7 @@ namespace wServer.networking
                     }
                     catch
                     {
-                        _logger?.LogError("Unknown packet ID {packetId:X2} from {endPoint}", 
+                        _logger?.LogError("Unknown packet ID {packetId:X2} from {endPoint}",
                             packetId, socket.RemoteEndPoint);
                         continue;
                     }
@@ -131,7 +141,8 @@ namespace wServer.networking
 
                         if (!Client.ExcludePacketsFromLogging.Contains((PacketID)packetId))
                         {
-                            _logger?.LogInformation("Received {packetId} ({packetType}) [{bodyLen} bytes] from {endPoint}",
+                            _logger?.LogInformation(
+                                "Received {packetId} ({packetType}) [{bodyLen} bytes] from {endPoint}",
                                 packetId, packet.GetType().Name, bodyLen, socket.RemoteEndPoint);
                         }
 
@@ -140,7 +151,7 @@ namespace wServer.networking
                     }
                     catch (Exception ex)
                     {
-                        _logger?.LogError(ex, "Error reading packet {packetId:X2} from {endPoint}", 
+                        _logger?.LogError(ex, "Error reading packet {packetId:X2} from {endPoint}",
                             packetId, socket.RemoteEndPoint);
                     }
                 }
@@ -170,7 +181,7 @@ namespace wServer.networking
                     }
                     catch (OperationCanceledException)
                     {
-                        _logger?.LogWarning("ReceiveExactAsync cancelled while waiting for {bytesNeeded} bytes", 
+                        _logger?.LogWarning("ReceiveExactAsync cancelled while waiting for {bytesNeeded} bytes",
                             buffer.Length - total);
                         break;
                     }
@@ -181,7 +192,7 @@ namespace wServer.networking
                     }
                     catch (SocketException ex)
                     {
-                        _logger?.LogError(ex, "SocketException in ReceiveExactAsync (Code {errorCode})", 
+                        _logger?.LogError(ex, "SocketException in ReceiveExactAsync (Code {errorCode})",
                             ex.SocketErrorCode);
                         break;
                     }
@@ -193,13 +204,13 @@ namespace wServer.networking
 
                     if (read == 0)
                     {
-                        _logger?.LogWarning("Socket closed mid-read (had {total}/{bufferLength} bytes)", 
+                        _logger?.LogWarning("Socket closed mid-read (had {total}/{bufferLength} bytes)",
                             total, buffer.Length);
                         break;
                     }
 
                     total += read;
-                    _logger?.LogDebug("ReceiveExactAsync read {read} bytes ({total}/{bufferLength})", 
+                    _logger?.LogDebug("ReceiveExactAsync read {read} bytes ({total}/{bufferLength})",
                         read, total, buffer.Length);
                 }
             }
@@ -240,13 +251,13 @@ namespace wServer.networking
                         sendLock.Release();
                         if (!Client.ExcludePacketsFromLogging.Contains(packet.ID))
                         {
-                            _logger?.LogDebug("Sent {packetType} [{len} bytes] to {endPoint}", 
+                            _logger?.LogDebug("Sent {packetType} [{len} bytes] to {endPoint}",
                                 packet.GetType().Name, len, socket.RemoteEndPoint);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger?.LogError(ex, "Error sending packet ({packetType})", 
+                        _logger?.LogError(ex, "Error sending packet ({packetType})",
                             packet?.GetType().Name ?? "null");
                         break;
                     }

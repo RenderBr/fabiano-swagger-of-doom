@@ -9,7 +9,7 @@ namespace wServer.realm.worlds
 {
     public class DavyJonesLocker : World
     {
-        public DavyJonesLocker()
+        public DavyJonesLocker(RealmManager manager) : base(manager)
         {
             Name = "Davy Jones's Locker";
             ClientWorldName = "dungeons.Davy_JonesAPOSs_Locker";

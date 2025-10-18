@@ -9,7 +9,7 @@ namespace wServer.realm.worlds
 {
     public class SnakePit : World
     {
-        public SnakePit()
+        public SnakePit(RealmManager manager) : base(manager)
         {
             Name = "Snake Pit";
             ClientWorldName = "dungeons.Snake_Pit";
@@ -25,7 +25,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client client)
         {
-            return Manager.AddWorld(new SnakePit());
+            return Manager.AddWorld(new SnakePit(Manager));
         }
     }
 }

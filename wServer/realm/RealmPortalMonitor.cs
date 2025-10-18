@@ -4,7 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
+using wServer.Events;
+using wServer.Factories;
+using wServer.Models.Properties;
 using wServer.realm.entities;
 using wServer.realm.worlds;
 
@@ -14,26 +16,21 @@ namespace wServer.realm
 {
     public class RealmPortalMonitor
     {
-        private readonly ILogger<RealmPortalMonitor> _logger;
-        private readonly RealmManager manager;
-        private readonly Nexus nexus;
+        private readonly ILogger _logger;
+    private Nexus nexus;
         private readonly Random rand = new Random();
         private readonly object worldLock = new object();
         public Dictionary<World, Portal> portals = new Dictionary<World, Portal>();
+        private readonly IPortalFactory portalFactory;
 
-        public RealmPortalMonitor(RealmManager manager)
+        public RealmPortalMonitor(ILogger<RealmPortalMonitor> logger, IEventBus _bus, IPortalFactory portalFactory)
         {
-            _logger = Program.Services?.GetRequiredService<ILogger<RealmPortalMonitor>>();
+            _logger = logger;
+            this.portalFactory = portalFactory;
             _logger?.LogInformation("Initializing Portal Monitor...");
-            this.manager = manager;
-            nexus = manager.Worlds[World.NEXUS_ID] as Nexus;
-            lock (worldLock)
-                foreach (KeyValuePair<int, World> i in manager.Worlds)
-                {
-                    if (i.Value is GameWorld)
-                        WorldAdded(i.Value);
-                }
-            _logger?.LogInformation("Portal Monitor initialized.");
+
+            _bus.Subscribe<WorldEvents.WorldCreatedEvent>(WorldAdded);
+            _bus.Subscribe<WorldEvents.WorldClosedEvent>(WorldClosed);
         }
 
         private Position GetRandPosition()
@@ -46,24 +43,39 @@ namespace wServer.realm
             } while (
                 portals.Values.Any(_ => _.X == x && _.Y == y) ||
                 nexus.Map[x, y].Region != TileRegion.Realm_Portals);
-            return new Position {X = x, Y = y};
+
+            return new Position { X = x, Y = y };
         }
 
-        public void WorldAdded(World world)
+        public void WorldAdded(WorldEvents.WorldCreatedEvent evt)
         {
             lock (worldLock)
             {
-                Position pos = GetRandPosition();
-                Portal portal = new Portal(manager, 0x0712, null)
+                if (evt.World is Nexus nx)
                 {
-                    Size = 80,
-                    WorldInstance = world,
-                    Name = world.Name
-                };
+                    nexus = nx;
+                }
+
+                if (nexus == null)
+                {
+                    _logger?.LogWarning("RealmPortalMonitor: Nexus not initialized yet; skipping portal creation for world {WorldId} ({WorldName}).", evt.World.Id, evt.World.Name);
+                    return;
+                }
+
+                var pos = GetRandPosition();
+                var portal = portalFactory.CreatePortal(new CreatePortalProperties()
+                {
+                    ObjType = 0x0712,
+                    Life = null,
+                    Name = evt.World.Name,
+                    WorldInstance = evt.World,
+                    Size = 80
+                }).Result;
+
                 portal.Move(pos.X + 0.5f, pos.Y + 0.5f);
                 nexus.EnterWorld(portal);
-                portals.Add(world, portal);
-                _logger?.LogInformation("World {WorldId}({WorldName}) added to monitor.", world.Id, world.Name);
+                portals.Add(evt.World, portal);
+                _logger?.LogInformation("World {WorldId}({WorldName}) added to monitor.", evt.World.Id, evt.World.Name);
             }
         }
 
@@ -83,8 +95,10 @@ namespace wServer.realm
             }
         }
 
-        public void WorldClosed(World world)
+        public void WorldClosed(WorldEvents.WorldClosedEvent evt)
         {
+            var world = evt.World;
+
             lock (worldLock)
             {
                 Portal portal = portals[world];
@@ -98,28 +112,24 @@ namespace wServer.realm
         {
             lock (worldLock)
             {
-                Position pos = GetRandPosition();
-                Portal portal = new Portal(manager, 0x71c, null)
+                if (nexus == null)
                 {
-                    Size = 150,
+                    _logger?.LogWarning("RealmPortalMonitor: Nexus not initialized yet; skipping portal creation for world {WorldId} ({WorldName}).", world.Id, world.Name);
+                    return;
+                }
+                var pos = GetRandPosition();
+                var portal = portalFactory.CreatePortal(new CreatePortalProperties()
+                {
+                    ObjType = 0x0712,
+                    Life = null,
+                    Name = world.Name,
                     WorldInstance = world,
-                    Name = world.Name
-                };
+                    Size = 80
+                }).Result;
                 portal.Move(pos.X, pos.Y);
                 nexus.EnterWorld(portal);
                 portals.Add(world, portal);
                 _logger?.LogInformation("World {WorldId}({WorldName}) opened.", world.Id, world.Name);
-            }
-        }
-
-        public World GetRandomRealm()
-        {
-            lock (worldLock)
-            {
-                World[] worlds = portals.Keys.ToArray();
-                if (worlds.Length == 0)
-                    return manager.Worlds[World.NEXUS_ID];
-                return worlds[Environment.TickCount%worlds.Length];
             }
         }
     }

@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 using db.JsonObjects;
 using db.Models;
 using RageRealm.Shared.Models;
+using RotMG.Common.Networking;
 using FailurePacket = wServer.networking.cliPackets.FailurePacket;
 
 #endregion
@@ -69,7 +70,8 @@ namespace wServer.networking
         public wRandom Random { get; internal set; }
         public string ConnectedBuild { get; internal set; }
         public int TargetWorld { get; internal set; }
-        
+        public bool Reconnecting { get; set; } = false;
+
         public static PacketID[] ExcludePacketsFromLogging =
         [
             PacketID.NEWTICK,
@@ -77,6 +79,11 @@ namespace wServer.networking
             PacketID.PING,
             PacketID.MOVE,
             PacketID.UPDATEACK,
+            PacketID.SHOOTACK,
+            PacketID.ENEMYSHOOT,
+            PacketID.PLAYERSHOOT,
+            PacketID.ALLYSHOOT,
+            PacketID.PONG
         ];
 
         public void BeginProcess()
@@ -134,7 +141,7 @@ namespace wServer.networking
                 log?.LogError(e, "Error when handling packet '{packetId}'...", pkt.ID);
             }
         }
-        
+
         public void DisconnectFromRealm()
         {
             if (Stage == ProtocalStage.Disconnected) return;
@@ -180,7 +187,14 @@ namespace wServer.networking
                     {
                         if (Socket?.Connected == true)
                         {
-                            try { Socket.Shutdown(SocketShutdown.Both); } catch { }
+                            try
+                            {
+                                Socket.Shutdown(SocketShutdown.Both);
+                            }
+                            catch
+                            {
+                            }
+
                             Socket.Close();
                         }
 
@@ -229,6 +243,8 @@ namespace wServer.networking
 
         public void Reconnect(ReconnectPacket pkt)
         {
+            Reconnecting = true;
+
             Manager.Logic.AddPendingAsyncAction(async t =>
             {
                 try
@@ -279,6 +295,7 @@ namespace wServer.networking
         public void Dispose()
         {
             if (disposed) return;
+            if (Reconnecting) return;
             handler?.Dispose();
             handler = null;
             ReceiveKey = null;

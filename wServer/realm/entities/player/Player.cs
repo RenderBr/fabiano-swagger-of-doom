@@ -575,14 +575,14 @@ namespace wServer.realm.entities.player
         }
 
         public void GivePet(PetItem petInfo)
-            {
-                //if (Name == "ossimc82" || Name == "C453")
-                //{
-                Pet = new Pet(Manager, petInfo, this);
-                Pet.Move(X, Y);
-                Owner.EnterWorld(Pet);
-                //}
-            }
+        {
+            //if (Name == "ossimc82" || Name == "C453")
+            //{
+            Pet = new Pet(Manager, petInfo, this);
+            Pet.Move(X, Y);
+            Owner.EnterWorld(Pet);
+            //}
+        }
 
         public override bool HitByProjectile(Projectile projectile, RealmTime time)
         {
@@ -809,7 +809,7 @@ namespace wServer.realm.entities.player
             }, null);
         }
 
-        public override void Tick(RealmTime time)
+        public override async Task Tick(RealmTime time)
         {
             try
             {
@@ -819,7 +819,7 @@ namespace wServer.realm.entities.player
                         Owner.LeaveWorld(this);
                     else
                         WorldInstance.LeaveWorld(this);
-                    Manager.Database.DoActionAsync(db => db.UnlockAccount(Client.Account));
+                    await Manager.Database.DoActionAsync(async db => await db.UnlockAccountAsync(Client.Account));
                     return;
                 }
 
@@ -829,7 +829,7 @@ namespace wServer.realm.entities.player
                         Owner.LeaveWorld(this);
                     else
                         WorldInstance.LeaveWorld(this);
-                    Manager.Database.DoActionAsync(db => db.UnlockAccount(Client.Account));
+                    await Manager.Database.DoActionAsync(async db => await db.UnlockAccountAsync(Client.Account));
                     return;
                 }
             }

@@ -25,7 +25,7 @@ namespace wServer.realm.worlds
         private Client psr;
         public string AccountId { get; private set; }
 
-        public Vault(bool isLimbo, Client psr = null)
+        public Vault(bool isLimbo, Client psr = null, RealmManager manager = null) : base(manager ?? psr?.Manager)
         {
             Id = VAULT_ID;
             Name = "Vault";

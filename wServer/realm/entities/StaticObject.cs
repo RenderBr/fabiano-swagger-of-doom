@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -132,13 +133,14 @@ namespace wServer.realm.entities
             }
             catch (Exception ex)
             {
-                Program.Services.GetRequiredService<ILogger<StaticObject>>().LogError(ex, "Crash halted - HP check error");
+                Program.Services.GetRequiredService<ILogger<StaticObject>>()
+                    .LogError(ex, "Crash halted - HP check error");
             }
 
             return true;
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
             if (Vulnerable)
             {
@@ -151,7 +153,7 @@ namespace wServer.realm.entities
                 CheckHP();
             }
 
-            base.Tick(time);
+            return base.Tick(time);
         }
     }
 }

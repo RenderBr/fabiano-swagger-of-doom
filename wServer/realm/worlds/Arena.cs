@@ -19,7 +19,7 @@ namespace wServer.realm.worlds
         private bool waiting;
         public int wave = 1;
 
-        public Arena()
+        public Arena(RealmManager manager) : base(manager)
         {
             Id = ARENA;
             Name = "Arena";

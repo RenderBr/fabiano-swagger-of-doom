@@ -49,7 +49,8 @@ namespace wServer.realm
             _pendings[(int)priority].Enqueue(callback);
         }
 
-        public void AddPendingAsyncAction(Func<RealmTime, Task> callback, PendingPriority priority = PendingPriority.Normal)
+        public void AddPendingAsyncAction(Func<RealmTime, Task> callback,
+            PendingPriority priority = PendingPriority.Normal)
         {
             _asyncPendings[(int)priority].Enqueue(callback);
         }
@@ -57,7 +58,7 @@ namespace wServer.realm
         /// <summary>
         /// Main game logic loop. Runs continuously until cancellation is requested.
         /// </summary>
-        public async Task TickLoop(CancellationToken cancellationToken)
+        public void TickLoop(CancellationToken cancellationToken)
         {
             _logger?.LogInformation("Logic loop started.");
 
@@ -78,71 +79,29 @@ namespace wServer.realm
 
                     count += times;
                     if (times > 3)
-                        _logger?.LogWarning("LAGGED! times={Times} dt={Dt} count={Count} elapsed={Elapsed} tps={Tps:F2}", times, dt, count, elapsed, count / (elapsed / 1000.0));
+                        _logger?.LogWarning(
+                            "LAGGED! times={Times} dt={Dt} count={Count} elapsed={Elapsed} tps={Tps:F2}",
+                            times, dt, count, elapsed, count / (elapsed / 1000.0));
 
                     t.tickTimes = elapsed;
                     t.tickCount = count;
                     t.thisTickCounts = (int)times;
                     t.thisTickTimes = (int)(times * MsPT);
 
-                    // process pending sync actions
+                    // run pending actions synchronously
                     foreach (var queue in _pendings)
-                    {
                         while (queue.TryDequeue(out var callback))
-                        {
-                            try
-                            {
-                                callback(t);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger?.LogError(ex, "Error in pending action");
-                            }
-                        }
-                    }
+                            SafeInvoke(() => callback(t));
 
-                    // process pending async actions
-                    var asyncTasks = new List<Task>();
+                    // run async actions *fire-and-forget* (don’t await them)
                     foreach (var queue in _asyncPendings)
-                    {
                         while (queue.TryDequeue(out var callback))
-                        {
-                            try
-                            {
-                                var task = callback(t);
-                                asyncTasks.Add(task);
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger?.LogError(ex, "Error starting async pending action");
-                            }
-                        }
-                    }
-
-                    // await all async actions to complete
-                    if (asyncTasks.Count > 0)
-                    {
-                        try
-                        {
-                            await Task.WhenAll(asyncTasks).ConfigureAwait(false);
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger?.LogError(ex, "Error in async pending actions");
-                        }
-                    }
+                            _ = Task.Run(() => SafeInvokeAsync(() => callback(t)));
 
                     // tick worlds
-                    try
-                    {
-                        TickWorlds(t);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error ticking worlds");
-                    }
+                    TickWorlds(t);
 
-                    // cleanup orphaned trade players
+                    // cleanups (trades, guilds)
                     try
                     {
                         var tradingPlayers = TradeManager.TradingPlayers
@@ -164,26 +123,16 @@ namespace wServer.realm
                         _logger?.LogError(ex, "Error cleaning trade managers");
                     }
 
-                    // tick guild manager
-                    try
-                    {
-                        GuildManager.Tick(CurrentTime);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger?.LogError(ex, "Error ticking guild manager");
-                    }
+                    SafeInvoke(() => GuildManager.Tick(CurrentTime));
 
-                    // wait until next tick
-                    await Task.Delay(MsPT, cancellationToken).ConfigureAwait(false);
+                    // fixed sleep
+                    long elapsedTick = watch.ElapsedMilliseconds - elapsed;
+                    int sleep = (int)(MsPT - elapsedTick);
+                    if (sleep > 0)
+                        Thread.Sleep(sleep);
 
-                    // measure drift
                     dt += Math.Max(0, watch.ElapsedMilliseconds - elapsed - MsPT);
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                // expected on shutdown
             }
             catch (Exception ex)
             {
@@ -194,6 +143,31 @@ namespace wServer.realm
                 _logger?.LogInformation("Logic loop stopped.");
             }
         }
+
+        private void SafeInvoke(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in pending action");
+            }
+        }
+
+        private async Task SafeInvokeAsync(Func<Task> func)
+        {
+            try
+            {
+                await func();
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error in async pending action");
+            }
+        }
+
 
         private void TickWorlds(RealmTime t)
         {

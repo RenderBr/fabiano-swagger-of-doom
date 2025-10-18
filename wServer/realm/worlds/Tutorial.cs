@@ -10,7 +10,7 @@ namespace wServer.realm.worlds
     {
         private readonly bool isLimbo;
 
-        public Tutorial(bool isLimbo)
+        public Tutorial(bool isLimbo, RealmManager manager) : base(manager)
         {
             Id = TUT_ID;
             Name = "Tutorial";
@@ -29,7 +29,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new Tutorial(false));
+            return Manager.AddWorld(new Tutorial(false, Manager));
         }
     }
 }

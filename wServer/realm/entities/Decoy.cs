@@ -3,6 +3,7 @@
 //using wServer.logic;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Mono.Game;
 using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
@@ -69,7 +70,7 @@ namespace wServer.realm.entities
             base.ExportStats(stats);
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
             if (HP > duration / 2)
             {
@@ -89,7 +90,7 @@ namespace wServer.realm.entities
                     PosA = new Position() { X = 1 }
                 }, null);
             }
-            base.Tick(time);
+            return base.Tick(time);
         }
     }
 }

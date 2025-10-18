@@ -15,7 +15,7 @@ namespace wServer.realm.worlds
 {
     public class DailyQuestRoom : World
     {
-        public DailyQuestRoom()
+        public DailyQuestRoom(RealmManager manager) : base(manager)
         {
             Name = "Daily Quest Room";
             ClientWorldName = "{nexus.Daily_Quest_Room}";
@@ -58,13 +58,13 @@ namespace wServer.realm.worlds
                                 Image = "dailyQuest.png"
                             };
                         }
-                        (entity as Player).Client.SendPacket(new networking.svrPackets.QuestFetchResponsePacket
-                        {
-                            Tier = q.Tier,
-                            Image = q.Image,
-                            Goal = q.Goal,
-                            Description = q.Description
-                        });
+                        // (entity as Player).Client.SendPacket(new networking.svrPackets.QuestFetchResponsePacket
+                        // {
+                        //     Tier = q.Tier,
+                        //     Image = q.Image,
+                        //     Goal = q.Goal,
+                        //     Description = q.Description
+                        // });
                     }
                 }));
             }

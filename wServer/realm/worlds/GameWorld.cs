@@ -24,7 +24,7 @@ namespace wServer.realm.worlds
 
         public Oryx? Overseer { get; private set; }
 
-        public GameWorld(int mapId, string name, bool oryxPresent, ILogger<GameWorld> logger)
+        public GameWorld(int mapId, string name, bool oryxPresent, ILogger<GameWorld> logger, RealmManager? manager = null) : base(manager)
         {
             _displayName = name;
             Name = name;
@@ -60,7 +60,7 @@ namespace wServer.realm.worlds
         /// <summary>
         /// Asynchronously creates a new GameWorld with an automatically selected name.
         /// </summary>
-        public static async Task<GameWorld> AutoNameAsync(RealmManager manager, int mapId, bool oryxPresent)
+        public static async Task<GameWorld> AutoNameAsync(int mapId, bool oryxPresent)
         {
             // Pick a random available realm name
             string name = RealmManager.Realms[new Random().Next(RealmManager.Realms.Count)];
@@ -73,7 +73,6 @@ namespace wServer.realm.worlds
             
             // Create and initialize the world asynchronously
             var world = gameWorldFactory.Create(mapId, name, oryxPresent);
-            world.Manager = manager;
             
             await world.InitAsync();
             return world;

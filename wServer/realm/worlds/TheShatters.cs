@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class TheShatters : World
     {
-        public TheShatters()
+        public TheShatters(RealmManager manager) : base(manager)
         {
             Name = "The Shatters";
             ClientWorldName = "shatters.The_Shatters";
@@ -32,7 +32,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new TheShatters());
+            return Manager.AddWorld(new TheShatters(Manager));
         }
 
         public void CloseBridge1()

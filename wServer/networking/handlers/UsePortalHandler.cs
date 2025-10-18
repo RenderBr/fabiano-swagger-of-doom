@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RageRealm.Shared.Models;
+using wServer.Factories;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -27,7 +28,10 @@ namespace wServer.networking.handlers
         protected override async Task HandlePacket(Client client, UsePortalPacket packet)
         {
             if (client.Player.Owner == null) return;
-            
+
+            await using var scope = Program.Services.CreateAsyncScope();
+            var worldFactory = scope.ServiceProvider.GetRequiredService<IWorldFactory>();
+
             Portal portal = client.Player.Owner.GetEntity(packet.ObjectId) as Portal;
             if (portal == null) return;
             if (!portal.Usable)
@@ -85,7 +89,7 @@ namespace wServer.networking.handlers
                             world = client.Player.Manager.GetWorld(World.NEXUS_ID);
                             break;
                         case 0x0753:
-                            world = client.Manager.AddWorld(new PetYard(client.Player));
+                            world = await client.Manager.AddWorldAsync(new PetYard(client.Player));
                             setWorldInstance = false;
                             break;
                         case 0x0712:
@@ -112,9 +116,7 @@ namespace wServer.networking.handlers
                             {
                                 try
                                 {
-                                    world = client.Manager.AddWorld((World)Activator.CreateInstance(worldType,
-                                        System.Reflection.BindingFlags.CreateInstance, null, null,
-                                        CultureInfo.InvariantCulture, null));
+                                    world = await worldFactory.CreateWorldAsync(worldType);
                                 }
                                 catch (Exception ex)
                                 {
@@ -150,7 +152,7 @@ namespace wServer.networking.handlers
                     client.Player.Manager.LastWorld.TryRemove(client.Player.AccountId, out dummy);
                 }
 
-                if (client.Player.Owner is Nexus || client.Player.Owner is GameWorld)
+                if (client.Player.Owner is Nexus or GameWorld)
                     client.Player.Manager.LastWorld.TryAdd(client.Player.AccountId, client.Player.Owner);
 
                 client.Reconnect(new ReconnectPacket

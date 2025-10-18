@@ -1,8 +1,10 @@
-﻿namespace wServer.realm.worlds
+﻿using System.Threading.Tasks;
+
+namespace wServer.realm.worlds
 {
     public class PirateCave : World
     {
-        public PirateCave()
+        public PirateCave(RealmManager manager) : base(manager)
         {
             Name = "Pirate Cave";
             ClientWorldName = "dungeons.Pirate_Cave";
@@ -11,9 +13,9 @@
             AllowTeleport = true;
         }
 
-        protected override void Init()
+        public override async Task InitAsync()
         {
-            LoadMap(GeneratorCache.NextPirateCave(Seed));
+            await LoadMapAsync(GeneratorCache.NextPirateCave(Seed));
         }
     }
 }

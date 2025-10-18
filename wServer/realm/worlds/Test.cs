@@ -14,7 +14,7 @@ namespace wServer.realm.worlds
     {
         public string js = null;
 
-        public Test()
+        public Test(RealmManager manager) : base(manager)
         {
             Id = TEST_ID;
             Name = "Test";

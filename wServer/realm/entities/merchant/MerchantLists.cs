@@ -266,27 +266,31 @@ namespace wServer.realm.entities
             {
                 if (item.Value.Texture1 != 0 && item.Value.ObjectId.Contains("Clothing") && item.Value.Class == "Dye")
                 {
-                    prices.Add(item.Value.ObjectType, new Tuple<int, CurrencyType>(51, CurrencyType.Fame));
+                    if (!prices.TryAdd(item.Value.ObjectType, new Tuple<int, CurrencyType>(51, CurrencyType.Fame)))
+                        _logger?.LogDebug("Price already exists for {ObjectId} (type: 0x{Type:X}); skipping duplicate.", item.Value.ObjectId, item.Value.ObjectType);
                     clothingDyeList.Add(item.Value.ObjectType);
                 }
 
                 if (item.Value.Texture2 != 0 && item.Value.ObjectId.Contains("Accessory") && item.Value.Class == "Dye")
                 {
-                    prices.Add(item.Value.ObjectType, new Tuple<int, CurrencyType>(51, CurrencyType.Fame));
+                    if (!prices.TryAdd(item.Value.ObjectType, new Tuple<int, CurrencyType>(51, CurrencyType.Fame)))
+                        _logger?.LogDebug("Price already exists for {ObjectId} (type: 0x{Type:X}); skipping duplicate.", item.Value.ObjectId, item.Value.ObjectType);
                     accessoryDyeList.Add(item.Value.ObjectType);
                 }
 
                 if (item.Value.Texture1 != 0 && item.Value.ObjectId.Contains("Cloth") &&
                     item.Value.ObjectId.Contains("Large"))
                 {
-                    prices.Add(item.Value.ObjectType, new Tuple<int, CurrencyType>(160, CurrencyType.Fame));
+                    if (!prices.TryAdd(item.Value.ObjectType, new Tuple<int, CurrencyType>(160, CurrencyType.Fame)))
+                        _logger?.LogDebug("Price already exists for {ObjectId} (type: 0x{Type:X}); skipping duplicate.", item.Value.ObjectId, item.Value.ObjectType);
                     clothingClothList.Add(item.Value.ObjectType);
                 }
 
                 if (item.Value.Texture2 != 0 && item.Value.ObjectId.Contains("Cloth") &&
                     item.Value.ObjectId.Contains("Small"))
                 {
-                    prices.Add(item.Value.ObjectType, new Tuple<int, CurrencyType>(160, CurrencyType.Fame));
+                    if (!prices.TryAdd(item.Value.ObjectType, new Tuple<int, CurrencyType>(160, CurrencyType.Fame)))
+                        _logger?.LogDebug("Price already exists for {ObjectId} (type: 0x{Type:X}); skipping duplicate.", item.Value.ObjectId, item.Value.ObjectType);
                     accessoryClothList.Add(item.Value.ObjectType);
                 }
             }

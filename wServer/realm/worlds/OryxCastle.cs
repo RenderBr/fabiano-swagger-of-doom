@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class OryxCastle : World
     {
-        public OryxCastle()
+        public OryxCastle(RealmManager manager) : base(manager)
         {
             Name = "Oryx's Castle";
             ClientWorldName = "server.Oryx's_Castle";
@@ -25,7 +25,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new OryxCastle());
+            return Manager.AddWorld(new OryxCastle(Manager));
         }
     }
 }

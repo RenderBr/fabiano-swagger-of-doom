@@ -8,10 +8,8 @@ namespace wServer.networking.svrPackets
 {
     public class QuestFetchResponsePacket : ServerPacket
     {
-        public int Tier { get; set; }
-        public string Goal { get; set; }
-        public string Description { get; set; }
-        public string Image { get; set; }
+        public QuestResponseItem[] Quests { get; set; }
+        public short NextRefreshPieces { get; set; }
 
 
         public override PacketID ID
@@ -26,18 +24,49 @@ namespace wServer.networking.svrPackets
         
         protected override void Read(Client client, NReader rdr)
         {
-            Tier = rdr.ReadInt32();
-            Goal = rdr.ReadUTF();
-            Description = rdr.ReadUTF();
-            Image = rdr.ReadUTF();
+            // server doesn't read this packet
         }
         
         protected override void Write(Client client, NWriter wtr)
         {
-            wtr.Write(Tier);
-            wtr.WriteUTF(Goal);
+            wtr.Write((short)Quests.Length);
+            foreach (var quest in Quests)
+                quest.Write(client, wtr);
+            wtr.Write(NextRefreshPieces);
+        }
+    }
+
+    public class QuestResponseItem
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public string Description { get; set; }
+        public string Expiration { get; set; }
+        public int[] Requirements { get; set; }
+        public int[] Rewards { get; set; }
+        public bool Completed { get; set; }
+        public bool ItemOfChoice { get; set; }
+        public bool Repeatable { get; set; }
+        public int Category { get; set; }
+        public int Weight { get; set; }
+        
+        public void Write(Client psr, NWriter wtr)
+        {
+            wtr.WriteUTF(Id);
+            wtr.WriteUTF(Name);
             wtr.WriteUTF(Description);
-            wtr.WriteUTF(Image);
+            wtr.WriteUTF(Expiration);
+            wtr.Write(Requirements.Length);
+            foreach (var req in Requirements)
+                wtr.Write(req);
+            wtr.Write(Rewards.Length);
+            foreach (var rew in Rewards)
+                wtr.Write(rew);
+            wtr.Write(Completed);
+            wtr.Write(ItemOfChoice);
+            wtr.Write(Repeatable);
+            wtr.Write(Category);
+            wtr.Write(Weight);
         }
     }
 }

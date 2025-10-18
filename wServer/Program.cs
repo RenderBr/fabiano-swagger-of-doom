@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RageRealm.Shared.Configuration;
 using RageRealm.Shared.Configuration.WorldServer;
+using wServer.Events;
 using wServer.Factories;
 using wServer.networking;
 using wServer.realm;
@@ -41,14 +42,16 @@ internal class Program
             if (!File.Exists("appsettings.json"))
             {
                 var defaultConfig = new WorldServerConfiguration();
-                var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig, new System.Text.Json.JsonSerializerOptions
-                { WriteIndented = true });
+                var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig,
+                    new System.Text.Json.JsonSerializerOptions
+                        { WriteIndented = true });
                 await File.WriteAllTextAsync("appsettings.json", json);
-                Console.WriteLine("Default configuration file created. Please review 'appsettings.json' and restart the server.");
+                Console.WriteLine(
+                    "Default configuration file created. Please review 'appsettings.json' and restart the server.");
                 Console.ReadKey();
                 return;
             }
-            
+
             var configBuilder = new ConfigurationBuilder()
                 .SetBasePath(AppContext.BaseDirectory)
                 .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
@@ -90,19 +93,29 @@ internal class Program
                 {
                     builder.AddDebug();
                 }
+                else
+                {
+                    builder.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+                }
 
                 if (Config.Logging.EnableFile && !string.IsNullOrEmpty(Config.Logging.FilePath))
                 {
                     builder.AddFile(Config.Logging.FilePath);
                 }
             });
+            serviceBuilder.AddSingleton<XmlDataService>();
 
             var connString =
-                $"server={Config.Database.Host};userid={Config.Database.User};password={Config.Database.Password};database={Config.Database.Name};SslMode=none;Convert Zero Datetime=True;";
+                $"server={Config.Database.Host};userid={Config.Database.User};password={Config.Database.Password};" +
+                $"database={Config.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
+
             serviceBuilder.AddDbContext<ServerDbContext>(options =>
-                options.UseMySql(connString, ServerVersion.AutoDetect(connString)));
+            {
+                options.UseMySql(connString, ServerVersion.AutoDetect(connString));
+            });
 
             // register your services/repositories
+            serviceBuilder.AddSingleton<IEventBus, EventBus>();
             serviceBuilder.AddScoped<IUnitOfWork, UnitOfWork>();
             serviceBuilder.AddScoped<AccountService>();
             serviceBuilder.AddScoped<IAccountRepository, AccountRepository>();
@@ -114,25 +127,26 @@ internal class Program
             serviceBuilder.AddScoped<IPetRepository, PetRepository>();
             serviceBuilder.AddScoped<IVaultRepository, VaultRepository>();
             serviceBuilder.AddScoped<IStatRepository, StatRepository>();
-
-            serviceBuilder.AddSingleton<XmlDataService>();
-
+            
             serviceBuilder.Configure<RealmConfiguration>(configuration.GetSection("Realm"));
-            serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
+            serviceBuilder.AddSingleton<DatabaseAdapter>();
             serviceBuilder.AddSingleton<RealmManager>();
+            serviceBuilder.AddSingleton<IPortalFactory, PortalFactory>();
+            serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
+            serviceBuilder.AddSingleton<IWorldFactory, WorldFactory>();
             serviceBuilder.AddSingleton<CharacterCreationService>();
+            serviceBuilder.AddTransient<RealmPortalMonitor>();
 
             Services = serviceBuilder.BuildServiceProvider();
             Logger = Services.GetRequiredService<ILogger<Program>>();
 
             // create the realm manager
             manager = Services.GetRequiredService<RealmManager>();
+            await manager.RunAsync();
+            
             WhiteList = Config.Realm.Whitelist;
             Verify = Config.Realm.VerifyEmail;
             WhiteListTurnOff = Config.Realm.WhitelistTurnOff;
-
-            manager.Initialize();
-            manager.RunAsync();
 
             // create the servers
             var server = new Server(manager);

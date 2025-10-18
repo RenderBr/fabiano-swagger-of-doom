@@ -2,7 +2,7 @@
 {
     public class TomboftheAncients : World
     {
-        public TomboftheAncients()
+        public TomboftheAncients(RealmManager manager) : base(manager)
         {
             Name = "Tomb of the Ancients";
             ClientWorldName = "dungeons.Tomb_of_the_Ancients";

@@ -2,7 +2,7 @@
 {
     public class ClothBazaar : World
     {
-        public ClothBazaar()
+        public ClothBazaar(RealmManager manager) : base(manager)
         {
             Id = MARKET;
             Name = "Cloth Bazaar";

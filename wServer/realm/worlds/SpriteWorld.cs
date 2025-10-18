@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class SpriteWorld : World
     {
-        public SpriteWorld()
+        public SpriteWorld(RealmManager manager) : base(manager)
         {
             Name = "Sprite World";
             ClientWorldName = "dungeons.Sprite_World";

@@ -145,7 +145,7 @@ namespace wServer.networking.handlers
                 if (packet.GameId == World.NEXUS_LIMBO) packet.GameId = World.NEXUS_ID;
                 World world = client.Manager.GetWorld(packet.GameId);
                 if (world == null && packet.GameId == World.TUT_ID)
-                    world = client.Manager.AddWorld(new Tutorial(false));
+                    world = client.Manager.AddWorld(new Tutorial(false, client.Manager));
                 if (world == null)
                 {
                     client.SendPacket(new FailurePacket
@@ -182,6 +182,7 @@ namespace wServer.networking.handlers
                     }
                 }
 
+                client.Reconnecting = false;
                 log.LogInformation(@"Client joined world {WorldID}", world.Id);
                 if (packet.MapInfo.Length > 0) //Test World
                     (world as Test).LoadJson(Encoding.Default.GetString(packet.MapInfo));

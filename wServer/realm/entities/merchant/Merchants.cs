@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -189,7 +190,7 @@ namespace wServer.realm.entities.merchant
             // });
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
             try
             {
@@ -248,6 +249,7 @@ namespace wServer.realm.entities.merchant
             {
                 _logger?.LogError(ex, "Error in merchants tick");
             }
+            return Task.CompletedTask;
         }
 
         public void Recreate(Merchants x)

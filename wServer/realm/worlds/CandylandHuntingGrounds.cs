@@ -2,7 +2,7 @@
 {
     public class CandylandHuntingGrounds : World
     {
-        public CandylandHuntingGrounds()
+        public CandylandHuntingGrounds(RealmManager manager) : base(manager)
         {
             Name = "Candyland Hunting Grounds";
             ClientWorldName = "dungeons.Candyland_Hunting_Grounds";

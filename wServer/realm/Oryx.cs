@@ -235,7 +235,7 @@ namespace wServer.realm
             World ocWorld = null;
             world.Timers.Add(new WorldTimer(2000, (w, t) =>
             {
-                ocWorld = world.Manager.AddWorld(new OryxCastle());
+                ocWorld = world.Manager.AddWorld(new OryxCastle(world.Manager));
                 ocWorld.Manager = world.Manager;
             }));
             world.Timers.Add(new WorldTimer(8000, (w, t) =>
@@ -334,7 +334,7 @@ namespace wServer.realm
             world.Manager.GetWorld(World.NEXUS_ID).Timers.Add(
                 new WorldTimer(130000, async (w, t) =>
                 {
-                    var newWorld = await GameWorld.AutoNameAsync(world.Manager, 1, true);
+                    var newWorld = await GameWorld.AutoNameAsync( 1, true);
                     w.Manager.AddWorld(newWorld);
                 })
             );

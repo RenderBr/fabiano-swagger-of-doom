@@ -12,7 +12,7 @@ namespace wServer.realm.worlds
 {
     public class AbyssofDemons : World
     {
-        public AbyssofDemons()
+        public AbyssofDemons(RealmManager manager) : base(manager)
         {
             Name = "Abyss of Demons";
             ClientWorldName = "{dungeons.Abyss_of_Demons}";
@@ -28,6 +28,6 @@ namespace wServer.realm.worlds
             LoadMap(GeneratorCache.NextAbyss(Seed));
         }
 
-        public override World GetInstance(Client psr) => Manager.AddWorld(new AbyssofDemons());
+        public override World GetInstance(Client psr) => Manager.AddWorld(new AbyssofDemons(Manager));
     }
 }

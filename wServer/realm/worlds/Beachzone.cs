@@ -2,7 +2,7 @@
 {
     public class Beachzone : World
     {
-        public Beachzone()
+        public Beachzone(RealmManager manager) : base(manager)
         {
             Name = "Beachzone";
             ClientWorldName = "{dungeons.Beachzone}";

@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class WineCellar : World
     {
-        public WineCellar()
+        public WineCellar(RealmManager manager) : base(manager)
         {
             Name = "Wine Cellar";
             ClientWorldName = "server.wine_cellar";
@@ -24,7 +24,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new WineCellar());
+            return Manager.AddWorld(new WineCellar(Manager));
         }
     }
 }

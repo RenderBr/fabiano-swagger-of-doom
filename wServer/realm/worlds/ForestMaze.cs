@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class ForestMaze : World
     {
-        public ForestMaze()
+        public ForestMaze(RealmManager manager) : base(manager)
         {
             Name = "Forest Maze";
             ClientWorldName = "dungeons.Forest_Maze";

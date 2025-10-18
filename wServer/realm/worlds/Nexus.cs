@@ -17,7 +17,7 @@ namespace wServer.realm.worlds
         public const string WINTER_RESOURCE = "wServer.realm.worlds.maps.nexus_winter.jm";
         public const string SUMMER_RESOURCE = "wServer.realm.worlds.maps.nexus_summer.jm";
 
-        public Nexus()
+        public Nexus(RealmManager manager) : base(manager)
         {
             Id = NEXUS_ID;
             Name = "Nexus";
@@ -26,7 +26,7 @@ namespace wServer.realm.worlds
             AllowTeleport = false;
             Difficulty = -1;
         }
-        
+
         public override async Task InitAsync()
         {
             await LoadMapAsync(SUMMER_RESOURCE, MapType.Json);
@@ -63,7 +63,7 @@ namespace wServer.realm.worlds
 
         private void UpdatePortals()
         {
-            foreach (var i in Manager.Monitor.portals)
+            foreach (var i in _portalMonitor.portals)
             {
                 foreach (var j in RealmManager.CurrentRealmNames)
                 {

@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using MySqlConnector;
 using RageRealm.Shared.Models;
 using wServer.realm.entities.player;
@@ -173,10 +174,10 @@ namespace wServer.realm.entities
             }
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
-            if (spawn == null) spawn = new Position(X, Y);
-            base.Tick(time);
+            spawn ??= new Position(X, Y);
+            return base.Tick(time);
         }
 
         public static async void Create(RealmManager manager, Player player, Item egg)

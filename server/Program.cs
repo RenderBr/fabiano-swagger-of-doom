@@ -70,7 +70,8 @@ namespace server
             serviceBuilder.AddSingleton(Config);
 
             var connString =
-                $"server={Config.Database.Host};userid={Config.Database.User};password={Config.Database.Password};database={Config.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
+                $"server={Config.Database.Host};userid={Config.Database.User};password={Config.Database.Password};" +
+                $"database={Config.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
             serviceBuilder.AddDbContext<ServerDbContext>(options =>
                 options.UseMySql(connString, ServerVersion.AutoDetect(connString)));
 

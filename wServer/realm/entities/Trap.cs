@@ -1,6 +1,7 @@
 ﻿#region
 
 //using wServer.logic;
+using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.networking.svrPackets;
 using wServer.realm.entities.player;
@@ -32,7 +33,7 @@ namespace wServer.realm.entities
             duration = (int) (effDuration*1000);
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
             if (t/500 == p)
             {
@@ -47,7 +48,7 @@ namespace wServer.realm.entities
                 if (p == LIFETIME*2)
                 {
                     Explode(time);
-                    return;
+                    return Task.CompletedTask;
                 }
             }
             t += time.thisTickTimes;
@@ -57,7 +58,7 @@ namespace wServer.realm.entities
             if (monsterNearby)
                 Explode(time);
 
-            base.Tick(time);
+            return base.Tick(time);
         }
 
         private void Explode(RealmTime time)

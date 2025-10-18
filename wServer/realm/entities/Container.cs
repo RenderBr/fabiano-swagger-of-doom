@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Xml.Linq;
 using RageRealm.Shared.Models;
 
@@ -72,20 +73,18 @@ namespace wServer.realm.entities
             base.ExportStats(stats);
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
-            if (ObjectType == 0x0504 || ObjectType == 0x0502) //Vault chest
-                return;
-            bool hasItem = false;
-            foreach (Item i in Inventory)
-                if (i != null)
-                {
-                    hasItem = true;
-                    break;
-                }
+            if (ObjectType is 0x0504 or 0x0502) //Vault chest
+                return Task.CompletedTask;
+            
+            var hasItem = Inventory.Any(i => i != null);
             if (!hasItem)
+            {
                 Owner.LeaveWorld(this);
-            base.Tick(time);
+            }
+
+            return base.Tick(time);
         }
 
         public override bool HitByProjectile(Projectile projectile, RealmTime time)

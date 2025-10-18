@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class OceanTrench : World
     {
-        public OceanTrench()
+        public OceanTrench(RealmManager manager) : base(manager)
         {
             Name = "Ocean Trench";
             ClientWorldName = "server.Ocean_Trench";
@@ -24,7 +24,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new OceanTrench());
+            return Manager.AddWorld(new OceanTrench(Manager));
         }
     }
 }

@@ -2,7 +2,7 @@
 {
     public class Kitchen : World
     {
-        public Kitchen()
+        public Kitchen(RealmManager manager) : base(manager)
         {
             Name = "Kitchen";
             ClientWorldName = "server.Kitchen";

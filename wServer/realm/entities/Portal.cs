@@ -3,7 +3,9 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading.Tasks;
 using RageRealm.Shared.Models;
+using wServer.Models.Properties;
 
 #endregion
 
@@ -17,6 +19,15 @@ namespace wServer.realm.entities
             Usable = objType != 0x0721;
             ObjectDesc = Manager.GameDataService.Portals[objType];
             Name = manager.GameDataService.Portals[objType].DisplayId;
+        }
+        
+        public Portal(RealmManager manager, CreatePortalProperties properties)
+            : base(manager, properties.ObjType, properties.Life, false, true, false)
+        {
+            Usable = properties.ObjType != 0x0721;
+            ObjectDesc = Manager.GameDataService.Portals[properties.ObjType];
+            Name = properties.Name ?? manager.GameDataService.Portals[properties.ObjType].DisplayId;
+            WorldInstance = properties.WorldInstance;
         }
 
         private Portal(RealmManager manager, PortalDesc desc, int? life)
@@ -48,11 +59,14 @@ namespace wServer.realm.entities
             };
         }
 
-        public override void Tick(RealmTime time)
+        public override Task Tick(RealmTime time)
         {
-            if(WorldInstance != null && IsRealmPortal)
+            if (WorldInstance != null && IsRealmPortal)
+            {
                 Usable = !(WorldInstance.Players.Count >= RealmManager.MAX_REALM_PLAYERS);
-            base.Tick(time);
+            }
+
+            return base.Tick(time);
         }
 
         public override bool HitByProjectile(Projectile projectile, RealmTime time)

@@ -8,7 +8,7 @@ namespace wServer.realm.worlds
 {
     public class UndeadLair : World
     {
-        public UndeadLair()
+        public UndeadLair(RealmManager manager) : base(manager)
         {
             Name = "Undead Lair";
             ClientWorldName = "dungeons.Undead_Lair";
@@ -24,7 +24,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new UndeadLair());
+            return Manager.AddWorld(new UndeadLair(Manager));
         }
     }
 }

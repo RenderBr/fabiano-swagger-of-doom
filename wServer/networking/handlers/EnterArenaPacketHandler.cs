@@ -42,7 +42,7 @@ namespace wServer.networking.handlers
                 });
             client.Save();
 
-            World world = client.Player.Manager.AddWorld(new Arena());
+            World world = client.Player.Manager.AddWorld(new Arena(client.Player.Manager));
 
             client.Reconnect(new ReconnectPacket
             {
