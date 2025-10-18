@@ -6,16 +6,15 @@ using DungeonGenerator.Templates.Abyss;
 using DungeonGenerator.Templates.Lab;
 using DungeonGenerator.Templates.PirateCave;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace wServer
 {
-    public class GeneratorCache
+    public class GeneratorCache(ILogger<GeneratorCache> logger)
     {
-        private static readonly ILogger log = Program.Services?.GetRequiredService<ILogger<GeneratorCache>>(); 
+        private ILogger log = logger;
         private static Dictionary<string, List<string>> cachedMaps;
 
-        public static void Init()
+        public void Init()
         {
             cachedMaps = new Dictionary<string, List<string>>();
             createCache("Abyss of Demons", new AbyssTemplate());
@@ -23,11 +22,11 @@ namespace wServer
             createCache("Pirate Cave", new PirateCaveTemplate());
         }
 
-        public static string NextAbyss(uint seed) => nextMap(seed, "Abyss of Demons", new AbyssTemplate());
-        public static string NextLab(uint seed) => nextMap(seed, "Mad Lab", new LabTemplate());
-        public static string NextPirateCave(uint seed) => nextMap(seed, "Pirate Cave", new PirateCaveTemplate());
+        public string NextAbyss(uint seed) => nextMap(seed, "Abyss of Demons", new AbyssTemplate());
+        public string NextLab(uint seed) => nextMap(seed, "Mad Lab", new LabTemplate());
+        public string NextPirateCave(uint seed) => nextMap(seed, "Pirate Cave", new PirateCaveTemplate());
 
-        private static string nextMap(uint seed, string key, DungeonTemplate template)
+        private string nextMap(uint seed, string key, DungeonTemplate template)
         {
             var map = cachedMaps[key][0];
             cachedMaps[key].RemoveAt(0);
@@ -36,14 +35,14 @@ namespace wServer
             return map;
         }
 
-        private static string generateNext(uint seed, DungeonTemplate template)
+        private string generateNext(uint seed, DungeonTemplate template)
         {
             var gen = new DungeonGen((int)seed, template);
             gen.GenerateAsync();
             return gen.ExportToJson();
         }
 
-        private static void createCache(string key, DungeonTemplate template)
+        private void createCache(string key, DungeonTemplate template)
         {
             log?.LogInformation("Generating cache for dungeon: {dungeonKey}", key);
             cachedMaps.Add(key, new List<string>());

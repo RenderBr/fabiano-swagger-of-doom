@@ -86,9 +86,11 @@ namespace wServer.realm.commands
 
     internal class BanCommand : Command
     {
-        public BanCommand() :
+        private readonly IAccountRepository _accounts;
+        public BanCommand(IAccountRepository accounts) :
             base("ban", permLevel: 1)
         {
+            _accounts = accounts;
         }
 
         protected override async Task<bool> Process(Player player, RealmTime time, string[] args)
@@ -99,9 +101,7 @@ namespace wServer.realm.commands
                 player.SendError("Player not found");
                 return false;
             }
-
-            using var scope = Program.Services.CreateScope();
-            var accountService = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
+            
             if (p.Client.Account.Banned)
             {
                 player.SendError("Player is already banned");
@@ -111,7 +111,7 @@ namespace wServer.realm.commands
             p.Client.Disconnect();
             p.Client.Account.Banned = true;
 
-            await accountService.SaveChangesAsync();
+            await _accounts.SaveChangesAsync();
             return true;
         }
     }
@@ -134,16 +134,15 @@ namespace wServer.realm.commands
 
     internal class PortalCommand : Command
     {
-        public PortalCommand()
+        private readonly RealmManager _realmManager;
+        public PortalCommand(RealmManager realmManager)
             : base("portal", 1)
         {
+            _realmManager = realmManager;
         }
 
         protected override Task<bool> Process(Player player, RealmTime time, string[] args)
         {
-            var scope = Program.Services.CreateScope();
-            var realmManager = scope.ServiceProvider.GetRequiredService<RealmManager>();
-            
             if(args.Length == 0)
             {
                 player.SendHelp("Usage: /portal <worldname>");
@@ -155,7 +154,7 @@ namespace wServer.realm.commands
             Portal portalEntity;
             try
             {
-                portalEntity = Entity.Resolve(realmManager, name) as Portal;
+                portalEntity = Entity.Resolve(_realmManager, name) as Portal;
             }catch(Exception)
             {
                 player.SendError("Unknown portal!");
@@ -480,9 +479,11 @@ namespace wServer.realm.commands
 
     internal class Mute : Command
     {
-        public Mute()
+        private readonly IAccountRepository _accounts;
+        public Mute(IAccountRepository accounts)
             : base("mute", 1)
         {
+            _accounts = accounts;
         }
 
         protected override async Task<bool> Process(Player player, RealmTime time, string[] args)
@@ -495,16 +496,13 @@ namespace wServer.realm.commands
 
             try
             {
-                using var scope = Program.Services.CreateScope();
-                var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
-
                 foreach (KeyValuePair<int, Player> i in player.Owner.Players)
                 {
                     if (i.Value.Name.ToLower() == args[0].ToLower().Trim())
                     {
-                        var account = await accountRepository.GetByIdAsync(i.Value.AccountId);
+                        var account = await _accounts.GetByIdAsync(i.Value.AccountId);
                         account.Muted = true;
-                        await accountRepository.SaveChangesAsync();
+                        await _accounts.SaveChangesAsync();
                         player.SendInfo("Player Muted.");
                     }
                 }
@@ -555,7 +553,8 @@ namespace wServer.realm.commands
 
     internal class UnMute : Command
     {
-        public UnMute()
+        private readonly IAccountRepository _accounts;
+        public UnMute(IAccountRepository accounts)
             : base("unmute", 1)
         {
         }
@@ -570,15 +569,13 @@ namespace wServer.realm.commands
 
             try
             {
-                using var scope = Program.Services.CreateScope();
-                var accountRepository = scope.ServiceProvider.GetRequiredService<IAccountRepository>();
                 foreach (KeyValuePair<int, Player> i in player.Owner.Players)
                 {
                     if (i.Value.Name.ToLower() == args[0].ToLower().Trim())
                     {
-                        var account = await accountRepository.GetByIdAsync(i.Value.AccountId);
+                        var account = await _accounts.GetByIdAsync(i.Value.AccountId);
                         account.Muted = false;
-                        await accountRepository.SaveChangesAsync();
+                        await _accounts.SaveChangesAsync();
                         player.SendInfo("Player Unmuted.");
                     }
                 }

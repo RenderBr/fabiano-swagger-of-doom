@@ -18,6 +18,7 @@ using wServer.Events;
 using wServer.Factories;
 using wServer.networking;
 using wServer.realm;
+using wServer.Services;
 
 internal class Program
 {
@@ -103,39 +104,21 @@ internal class Program
                     builder.AddFile(Config.Logging.FilePath);
                 }
             });
-            serviceBuilder.AddSingleton<XmlDataService>();
-
-            var connString =
-                $"server={Config.Database.Host};userid={Config.Database.User};password={Config.Database.Password};" +
-                $"database={Config.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
-
-            serviceBuilder.AddDbContext<ServerDbContext>(options =>
-            {
-                options.UseMySql(connString, ServerVersion.AutoDetect(connString));
-            });
 
             // register your services/repositories
+            serviceBuilder.AddSingleton<XmlDataService>();
             serviceBuilder.AddSingleton<IEventBus, EventBus>();
-            serviceBuilder.AddScoped<IUnitOfWork, UnitOfWork>();
-            serviceBuilder.AddScoped<AccountService>();
-            serviceBuilder.AddScoped<IAccountRepository, AccountRepository>();
-            serviceBuilder.AddScoped<ICharacterRepository, CharacterRepository>();
-            serviceBuilder.AddScoped<IDailyQuestRepository, DailyQuestRepository>();
-            serviceBuilder.AddScoped<IDeathRepository, DeathRepository>();
-            serviceBuilder.AddScoped<IGuildRepository, GuildRepository>();
-            serviceBuilder.AddScoped<INewsRepository, NewsRepository>();
-            serviceBuilder.AddScoped<IPetRepository, PetRepository>();
-            serviceBuilder.AddScoped<IVaultRepository, VaultRepository>();
-            serviceBuilder.AddScoped<IStatRepository, StatRepository>();
-            
+            serviceBuilder.AddDataServices(configuration)
+                    .AddRepositoryServices();
+
             serviceBuilder.Configure<RealmConfiguration>(configuration.GetSection("Realm"));
-            serviceBuilder.AddSingleton<DatabaseAdapter>();
             serviceBuilder.AddSingleton<RealmManager>();
             serviceBuilder.AddSingleton<IPortalFactory, PortalFactory>();
             serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
             serviceBuilder.AddSingleton<IWorldFactory, WorldFactory>();
             serviceBuilder.AddSingleton<CharacterCreationService>();
             serviceBuilder.AddTransient<RealmPortalMonitor>();
+            serviceBuilder.AddHandlingServices();
 
             Services = serviceBuilder.BuildServiceProvider();
             Logger = Services.GetRequiredService<ILogger<Program>>();
@@ -143,7 +126,7 @@ internal class Program
             // create the realm manager
             manager = Services.GetRequiredService<RealmManager>();
             await manager.RunAsync();
-            
+
             WhiteList = Config.Realm.Whitelist;
             Verify = Config.Realm.VerifyEmail;
             WhiteListTurnOff = Config.Realm.WhitelistTurnOff;

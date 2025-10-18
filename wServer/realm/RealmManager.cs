@@ -68,11 +68,12 @@ namespace wServer.realm
         private IEventBus _eventBus;
 
         public RealmManager(ILogger<RealmManager> logger, IOptions<RealmConfiguration> options,
-            XmlDataService xmlDataService, DatabaseAdapter database, IEventBus eventBus)
+            XmlDataService xmlDataService, DatabaseAdapter database, IEventBus eventBus, CommandManager commandManager, GeneratorCache generatorCache)
         {
             _logger = logger;
             _logger.LogInformation("Initializing Realm Manager...");
             _eventBus = eventBus;
+            Commands = commandManager;
 
             MaxClients = options.Value.MaxClients;
             TPS = options.Value.Tps;
@@ -81,7 +82,7 @@ namespace wServer.realm
             Database = database;
             GameDataService = xmlDataService;
             Behaviors = new BehaviorDb(this);
-            GeneratorCache.Init();
+            generatorCache.Init();
             MerchantLists.InitMerchatLists(GameDataService);
 
             AddWorld(World.NEXUS_ID, Worlds[0] = new Nexus(this));
@@ -105,7 +106,6 @@ namespace wServer.realm
 
 
             Chat = new ChatManager(this);
-            Commands = new CommandManager(this);
 
             _logger.LogInformation("Realm Manager initialized.");
         }
@@ -136,8 +136,8 @@ namespace wServer.realm
             _networkTask = Task.Run(async () => await Network.TickLoop(_cts.Token));
             _logicTask = Task.Run(() => Logic.TickLoop(_cts.Token));
 
-            await Task.CompletedTask;
             _logger.LogInformation("Realm Manager started.");
+            await Task.Yield();
         }
 
         public async Task CloseWorldAsync(World world)

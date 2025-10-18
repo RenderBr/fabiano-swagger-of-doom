@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,18 +15,20 @@ namespace wServer.realm.commands
 {
     public abstract class Command
     {
-        protected readonly ILogger<Command> _logger;
+        protected readonly IServiceProvider Services;
+        private readonly ILogger<Command> _logger;
+        public string CommandName { get; private set; }
+        public int PermissionLevel { get; private set; }
 
-        public Command(string name, int permLevel = 0)
+        protected Command(string name, int permLevel = 0, IServiceProvider services = null)
         {
-            _logger = Program.Services?.GetRequiredService<ILogger<Command>>();
+            Services = services;
+            _logger = Services?.GetRequiredService<ILogger<Command>>();
             CommandName = name;
             PermissionLevel = permLevel;
         }
 
-        public string CommandName { get; private set; }
-        public int PermissionLevel { get; private set; }
-
+        protected T GetRequiredService<T>() => Services.GetRequiredService<T>();
         protected abstract Task Process(Player player, RealmTime time, string[] args);
 
         private static int GetPermissionLevel(Player player)
@@ -67,22 +70,20 @@ namespace wServer.realm.commands
 
     public class CommandManager
     {
-        private readonly ILogger<CommandManager> _logger;
+        private readonly IServiceProvider _services;
         private readonly Dictionary<string, Command> cmds;
-        private RealmManager manager;
 
-        public CommandManager(RealmManager manager)
+        public CommandManager(IServiceProvider services)
         {
-            _logger = Program.Services?.GetRequiredService<ILogger<CommandManager>>();
-            this.manager = manager;
+            _services = services;
             cmds = new Dictionary<string, Command>(StringComparer.InvariantCultureIgnoreCase);
-            Type t = typeof (Command);
-            foreach (Type i in t.Assembly.GetTypes())
-                if (t.IsAssignableFrom(i) && i != t)
-                {
-                    Command instance = (Command) Activator.CreateInstance(i);
-                    cmds.Add(instance.CommandName, instance);
-                }
+
+            foreach (var type in typeof(Command).Assembly.GetTypes()
+                         .Where(t => !t.IsAbstract && typeof(Command).IsAssignableFrom(t)))
+            {
+                var command = (Command)_services.GetRequiredService(type);
+                cmds.Add(command.CommandName.ToLowerInvariant(), command);
+            }
         }
 
         public IDictionary<string, Command> Commands
@@ -102,7 +103,7 @@ namespace wServer.realm.commands
                 player.SendError("Unknown command!");
                 return false;
             }
-            _logger?.LogInformation("[Command] <{PlayerName}> {CommandText}", player.Name, text);
+
             return command.Execute(player, time, args);
         }
     }

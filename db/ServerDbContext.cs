@@ -62,7 +62,7 @@ public class ServerDbContext : DbContext
 
         modelBuilder.Entity<Vault>()
             .HasOne(v => v.Account)
-            .WithMany()
+            .WithMany(a => a.Vaults)
             .HasForeignKey(v => v.AccountId)
             .OnDelete(DeleteBehavior.Cascade);
 

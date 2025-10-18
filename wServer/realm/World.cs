@@ -47,6 +47,7 @@ namespace wServer.realm
 
         private int _entityInc;
         protected RealmPortalMonitor _portalMonitor;
+        protected GeneratorCache _generatorCache;
         private bool _canBeClosed;
         public RealmManager Manager { get; internal set; }
 
@@ -56,6 +57,7 @@ namespace wServer.realm
             Manager = manager;
             _logger = scope.ServiceProvider.GetRequiredService<ILogger<World>>();
             _portalMonitor = scope.ServiceProvider.GetService<RealmPortalMonitor>();
+            _generatorCache = scope.ServiceProvider.GetService<GeneratorCache>();
             
             Players = new ConcurrentDictionary<int, Player>();
             Enemies = new ConcurrentDictionary<int, Enemy>();

@@ -25,7 +25,7 @@ namespace wServer.realm.worlds
 
         protected override void Init()
         {
-            LoadMap(GeneratorCache.NextAbyss(Seed));
+            LoadMap(_generatorCache.NextAbyss(Seed));
         }
 
         public override World GetInstance(Client psr) => Manager.AddWorld(new AbyssofDemons(Manager));

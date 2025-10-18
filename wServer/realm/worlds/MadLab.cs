@@ -15,7 +15,7 @@ namespace wServer.realm.worlds
 
         public override async Task InitAsync()
         {
-            await LoadMapAsync(GeneratorCache.NextLab(Seed));
+            await LoadMapAsync(_generatorCache.NextLab(Seed));
         }
     }
 }
