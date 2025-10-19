@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RageRealm.Shared.Models;
+using wServer;
 using wServer.networking.svrPackets;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -19,7 +20,8 @@ namespace wServer.realm.worlds
         private bool waiting;
         public int wave = 1;
 
-        public Arena(RealmManager manager) : base(manager)
+        public Arena(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache)
+            : base(manager, logger, portalMonitor, generatorCache)
         {
             Id = ARENA;
             Name = "Arena";

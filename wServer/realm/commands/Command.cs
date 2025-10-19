@@ -16,14 +16,14 @@ namespace wServer.realm.commands
     public abstract class Command
     {
         protected readonly IServiceProvider Services;
-        private readonly ILogger<Command> _logger;
+        private readonly ILogger _logger;
         public string CommandName { get; private set; }
         public int PermissionLevel { get; private set; }
 
-        protected Command(string name, int permLevel = 0, IServiceProvider services = null)
+        protected Command(string name, int permLevel = 0, IServiceProvider services = null, ILogger logger = null)
         {
             Services = services;
-            _logger = Services?.GetRequiredService<ILogger<Command>>();
+            _logger = logger;
             CommandName = name;
             PermissionLevel = permLevel;
         }
@@ -73,17 +73,27 @@ namespace wServer.realm.commands
         private readonly IServiceProvider _services;
         private readonly Dictionary<string, Command> cmds;
 
-        public CommandManager(IServiceProvider services)
+        public CommandManager(IServiceProvider services, ILogger<CommandManager> logger)
         {
+            logger.LogInformation("Initializing Command Manager...");
             _services = services;
             cmds = new Dictionary<string, Command>(StringComparer.InvariantCultureIgnoreCase);
 
             foreach (var type in typeof(Command).Assembly.GetTypes()
                          .Where(t => !t.IsAbstract && typeof(Command).IsAssignableFrom(t)))
             {
-                var command = (Command)_services.GetRequiredService(type);
-                cmds.Add(command.CommandName.ToLowerInvariant(), command);
+                logger.LogInformation("Creating command type {TypeName}", type.FullName);
+                try
+                {
+                    var command = (Command)ActivatorUtilities.CreateInstance(_services, type);
+                    cmds.Add(command.CommandName.ToLowerInvariant(), command);
+                }catch(Exception ex)
+                {
+                    logger.LogError(ex, "Failed to create command type {TypeName}", type.FullName);
+                }
             }
+            
+            logger.LogInformation("Command Manager initialized with {Count} commands.", cmds.Count);
         }
 
         public IDictionary<string, Command> Commands

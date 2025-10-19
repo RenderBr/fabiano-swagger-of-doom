@@ -1,7 +1,9 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using db;
+using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
@@ -11,7 +13,7 @@ using wServer.realm.worlds;
 
 namespace wServer.networking.handlers
 {
-    internal class EnterArenaPacketHandler : PacketHandlerBase<EnterArenaPacket>
+    internal class EnterArenaPacketHandler(IServiceProvider serviceProvider) : PacketHandlerBase<EnterArenaPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -20,7 +22,7 @@ namespace wServer.networking.handlers
 
         protected override Task HandlePacket(Client client, EnterArenaPacket packet)
         {
-              client.Manager.Database.DoActionAsync(async db =>
+            client.Manager.Database.DoActionAsync(async db =>
             {
                 if (packet.Currency == 1)
                 {
@@ -30,8 +32,8 @@ namespace wServer.networking.handlers
                 }
                 else
                 {
-                        db.UpdateCredit(client.Account, -50);
-                        client.Player.Credits = client.Account.Credits;
+                    db.UpdateCredit(client.Account, -50);
+                    client.Player.Credits = client.Account.Credits;
                     client.SendPacket(new BuyResultPacket
                     {
                         Result = 0,
@@ -39,10 +41,12 @@ namespace wServer.networking.handlers
                     });
                     client.Player.UpdateCount++;
                 }
-                });
+            });
             client.Save();
 
-            World world = client.Player.Manager.AddWorld(new Arena(client.Player.Manager));
+            World world = client.Player.Manager.AddWorld(new Arena(client.Player.Manager,
+                client.Player.Manager.WorldLogger, client.Player.Manager.PortalMonitor,
+                client.Player.Manager.GeneratorCache));
 
             client.Reconnect(new ReconnectPacket
             {
@@ -52,7 +56,7 @@ namespace wServer.networking.handlers
                 Name = world.Name,
                 Key = Empty<byte>.Array,
             });
-            
+
             return Task.CompletedTask;
         }
     }

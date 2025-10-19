@@ -15,7 +15,7 @@ using wServer.realm.entities.player;
 
 namespace wServer.networking.handlers
 {
-    internal class PlayerShootPacketHandler : PacketHandlerBase<PlayerShootPacket>
+    internal class PlayerShootPacketHandler(IServiceProvider serviceProvider) : PacketHandlerBase<PlayerShootPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -42,14 +42,19 @@ namespace wServer.networking.handlers
 
                 if (client.Player.SlotTypes[stype] != item.SlotType && client.Account.Rank < 2)
                 {
-                    Program.Services.GetRequiredService<ILogger<PlayerShootPacketHandler>>().LogCritical("{PlayerName} is trying to cheat (Weapon doesnt match the slot type)", client.Player.Name);
-                    client.Player.SendError("This cheating attempt has beed logged and a message was send to all online admins.");
+                    ServiceProvider.GetRequiredService<ILogger<PlayerShootPacketHandler>>().LogCritical(
+                        "{PlayerName} is trying to cheat (Weapon doesnt match the slot type)", client.Player.Name);
+                    client.Player.SendError(
+                        "This cheating attempt has beed logged and a message was send to all online admins.");
                     client.Disconnect();
                     foreach (Player player in client.Player.Owner.Players.Values)
                         if (player.Client.Account.Rank >= 2)
-                            player.SendInfo(String.Format("Player {0} is shooting with a weapon that doesnt match the class slot type.", client.Player.Name));
+                            player.SendInfo(String.Format(
+                                "Player {0} is shooting with a weapon that doesnt match the class slot type.",
+                                client.Player.Name));
                     return;
                 }
+
                 ProjectileDesc prjDesc = item.Projectiles[0]; //Assume only one
                 Projectile prj = client.Player.PlayerShootProjectile(
                     packet.BulletId, prjDesc, item.ObjectType,

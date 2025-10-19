@@ -18,7 +18,7 @@ using FailurePacket = wServer.networking.svrPackets.FailurePacket;
 
 namespace wServer.networking.handlers
 {
-    internal class UsePortalHandler : PacketHandlerBase<UsePortalPacket>
+    internal class UsePortalHandler(IServiceProvider serviceProvider) : PacketHandlerBase<UsePortalPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -29,7 +29,7 @@ namespace wServer.networking.handlers
         {
             if (client.Player.Owner == null) return;
 
-            await using var scope = Program.Services.CreateAsyncScope();
+            await using var scope = ServiceProvider.CreateAsyncScope();
             var worldFactory = scope.ServiceProvider.GetRequiredService<IWorldFactory>();
 
             Portal portal = client.Player.Owner.GetEntity(packet.ObjectId) as Portal;
@@ -122,7 +122,7 @@ namespace wServer.networking.handlers
                                 {
                                     client.Player.SendError("Error while creating world instance:");
                                     client.Player.SendError(ex.ToString());
-                                    Program.Services.GetRequiredService<ILogger<UsePortalHandler>>()
+                                    ServiceProvider.GetRequiredService<ILogger<UsePortalHandler>>()
                                         .LogError(ex, "Error while creating world instance");
                                 }
                             }

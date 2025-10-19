@@ -9,7 +9,7 @@ using wServer.networking.cliPackets;
 
 namespace wServer.networking.handlers
 {
-    internal class PlayerTextHandler : PacketHandlerBase<PlayerTextPacket>
+    internal class PlayerTextHandler(IServiceProvider serviceProvider) : PacketHandlerBase<PlayerTextPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -23,7 +23,9 @@ namespace wServer.networking.handlers
                 if (client.Player.Owner == null) return;
 
                 if (packet.Text[0] == '/')
-                    client.Player.Manager.Commands.Execute(client.Player, t, packet.Text);
+                {
+                    //client.Player.Manager.Commands.Execute(client.Player, t, packet.Text);
+                }
                 else
                 {
                     if (client.Player.Muted)
@@ -31,11 +33,13 @@ namespace wServer.networking.handlers
                         client.Player.SendInfo("{\"key\":\"server.muted\"}");
                         return;
                     }
+
                     if (!client.Player.NameChosen)
                     {
                         client.Player.SendInfo("{\"key\":\"server.must_be_named\"}");
                         return;
                     }
+
                     if (!String.IsNullOrWhiteSpace(packet.Text))
                         client.Player.Manager.Chat.Say(client.Player, packet.Text);
                     else

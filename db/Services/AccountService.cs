@@ -2,17 +2,20 @@ using System;
 using System.Threading.Tasks;
 using db.Models;
 using db.Repositories;
-using MySqlConnector;
+using Microsoft.Extensions.Logging;
 
 namespace db.Services;
 
 public class AccountService
 {
     private readonly IUnitOfWork _unitOfWork;
-
-    public AccountService(IUnitOfWork unitOfWork)
+    private readonly ILogger<AccountService> _logger;
+    
+    public AccountService(IUnitOfWork unitOfWork, ILogger<AccountService> logger)
     {
         _unitOfWork = unitOfWork;
+        _logger = logger;
+        _logger.LogInformation("AccountService initialized.");
     }
 
     public async Task<Account> VerifyAsync(string uuid, string password)

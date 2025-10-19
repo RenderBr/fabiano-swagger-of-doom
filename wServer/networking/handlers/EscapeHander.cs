@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
@@ -9,7 +10,8 @@ using wServer.realm;
 
 namespace wServer.networking.handlers
 {
-    internal class EscapeHander : PacketHandlerBase<EscapePacket>
+    internal class EscapeHander(IServiceProvider serviceProvider)
+        : PacketHandlerBase<EscapePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -31,6 +33,7 @@ namespace wServer.networking.handlers
                 });
                 return Task.CompletedTask;
             }
+
             client.Reconnect(new ReconnectPacket
             {
                 Host = "",

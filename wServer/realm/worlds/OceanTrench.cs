@@ -1,5 +1,7 @@
 ﻿#region
 
+using Microsoft.Extensions.Logging;
+using wServer;
 using wServer.networking;
 
 #endregion
@@ -8,7 +10,7 @@ namespace wServer.realm.worlds
 {
     public class OceanTrench : World
     {
-        public OceanTrench(RealmManager manager) : base(manager)
+        public OceanTrench(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Ocean Trench";
             ClientWorldName = "server.Ocean_Trench";
@@ -24,7 +26,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new OceanTrench(Manager));
+            return Manager.AddWorld(new OceanTrench(Manager, _logger, _portalMonitor, _generatorCache));
         }
     }
 }

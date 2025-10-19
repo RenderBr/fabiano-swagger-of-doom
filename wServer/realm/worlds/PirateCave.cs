@@ -1,10 +1,12 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using wServer;
 
 namespace wServer.realm.worlds
 {
     public class PirateCave : World
     {
-        public PirateCave(RealmManager manager) : base(manager)
+        public PirateCave(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Pirate Cave";
             ClientWorldName = "dungeons.Pirate_Cave";

@@ -1,19 +1,17 @@
-﻿using db;
+﻿using System;
+using db;
 using db.data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using Microsoft.Extensions.DependencyInjection;
 using db.Repositories;
 using db.Models;
+using Microsoft.Extensions.Logging;
 
 namespace wServer.networking.handlers
 {
-    internal class TinkerQuestHandler : PacketHandlerBase<TinkerQuestPacket>
+    internal class TinkerQuestHandler(IServiceProvider serviceProvider) : PacketHandlerBase<TinkerQuestPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -22,12 +20,13 @@ namespace wServer.networking.handlers
 
         protected override async Task HandlePacket(Client client, TinkerQuestPacket packet)
         {
-            using (var scope = Program.Services.CreateScope())
+            using (var scope = ServiceProvider.CreateScope())
             {
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
                 if (packet.Object.ObjectType == client.Player.Inventory[packet.Object.SlotId].ObjectType &&
-                    (int)client.Player.Inventory[packet.Object.SlotId].ObjectType == Utils.FromString(client.Player.DailyQuest.Goal))
+                    (int)client.Player.Inventory[packet.Object.SlotId].ObjectType ==
+                    Utils.FromString(client.Player.DailyQuest.Goal))
                 {
                     client.SendPacket(new QuestRedeemResponsePacket
                     {
@@ -36,7 +35,9 @@ namespace wServer.networking.handlers
                     });
                     client.Player.Inventory[packet.Object.SlotId] = null;
                     await GiveRewardsAsync(unitOfWork, client.Account, client.Player.DailyQuest.Tier - 1);
-                    int tier = client.Player.DailyQuest.Tier == DailyQuestConstants.QuestsPerDay ? -1 : (client.Player.DailyQuest.Tier + 1);
+                    int tier = client.Player.DailyQuest.Tier == DailyQuestConstants.QuestsPerDay
+                        ? -1
+                        : (client.Player.DailyQuest.Tier + 1);
                     // Update daily quest tier
                     var dailyQuest = await unitOfWork.DailyQuests.GetByAccountIdAsync(client.Account.Id);
                     if (dailyQuest != null)
@@ -44,8 +45,10 @@ namespace wServer.networking.handlers
                         dailyQuest.Tier = (byte)tier;
                         await unitOfWork.SaveChangesAsync();
                     }
+
                     // Refresh daily quest
-                    client.Player.DailyQuest = await GetDailyQuestAsync(unitOfWork, client.Account.Id, Manager.GameDataService);
+                    client.Player.DailyQuest =
+                        await GetDailyQuestAsync(unitOfWork, client.Account.Id, Manager.GameDataService);
                     client.Player.UpdateCount++;
                     client.Player.SaveToCharacter();
                 }
@@ -63,7 +66,8 @@ namespace wServer.networking.handlers
             }
         }
 
-        private async Task<QuestItem> GetDailyQuestAsync(IUnitOfWork unitOfWork, long accountId, XmlDataService gameDataService)
+        private async Task<QuestItem> GetDailyQuestAsync(IUnitOfWork unitOfWork, long accountId,
+            XmlDataService gameDataService)
         {
             var dailyQuest = await unitOfWork.DailyQuests.GetByAccountIdAsync(accountId);
             if (dailyQuest == null)
@@ -72,6 +76,7 @@ namespace wServer.networking.handlers
                 await unitOfWork.DailyQuests.AddAsync(dailyQuest);
                 await unitOfWork.SaveChangesAsync();
             }
+
             // Create QuestItem from DailyQuest
             return new QuestItem
             {

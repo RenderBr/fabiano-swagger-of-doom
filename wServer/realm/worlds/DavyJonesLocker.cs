@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using wServer;
 using wServer.realm.entities.player;
 
 namespace wServer.realm.worlds
 {
     public class DavyJonesLocker : World
     {
-        public DavyJonesLocker(RealmManager manager) : base(manager)
+        public DavyJonesLocker(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Davy Jones's Locker";
             ClientWorldName = "dungeons.Davy_JonesAPOSs_Locker";

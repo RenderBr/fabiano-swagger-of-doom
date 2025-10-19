@@ -293,7 +293,7 @@ namespace wServer
             }
             catch (Exception e)
             {
-                Program.Logger.LogError(e, "Error while serializing ObjectStats");
+                Console.WriteLine("Error while serializing ObjectStats: " + e);
             }
         }
     }

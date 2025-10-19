@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 
@@ -7,7 +8,8 @@ using wServer.networking.cliPackets;
 
 namespace wServer.networking.handlers
 {
-    internal class AOEAckHandler : PacketHandlerBase<AOEAckPacket>
+    internal class AOEAckHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<AOEAckPacket>(serviceProvider)
     {
         public override PacketID ID
         {

@@ -3,7 +3,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using RageRealm.Shared.Models;
+using wServer;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.terrain;
@@ -17,7 +19,9 @@ namespace wServer.realm.worlds
         public const string WINTER_RESOURCE = "wServer.realm.worlds.maps.nexus_winter.jm";
         public const string SUMMER_RESOURCE = "wServer.realm.worlds.maps.nexus_summer.jm";
 
-        public Nexus(RealmManager manager) : base(manager)
+        public Nexus(RealmManager manager, ILogger<World> logger,
+            RealmPortalMonitor portalMonitor, GeneratorCache generatorCache)
+            : base(manager, logger, portalMonitor, generatorCache)
         {
             Id = NEXUS_ID;
             Name = "Nexus";

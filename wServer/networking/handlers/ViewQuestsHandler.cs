@@ -1,17 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using Microsoft.Extensions.DependencyInjection;
 using db.Repositories;
 using db.Models;
+using Microsoft.Extensions.Logging;
 
 namespace wServer.networking.handlers
 {
-    internal class ViewQuestsHandler : PacketHandlerBase<ViewQuestsPacket>
+    internal class ViewQuestsHandler(IServiceProvider serviceProvider) : PacketHandlerBase<ViewQuestsPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -20,7 +18,7 @@ namespace wServer.networking.handlers
 
         protected override async Task HandlePacket(Client client, ViewQuestsPacket packet)
         {
-            using (var scope = Program.Services.CreateScope())
+            using (var scope = ServiceProvider.CreateScope())
             {
                 var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
                 var dailyQuest = await unitOfWork.DailyQuests.GetByAccountIdAsync(client.Account.Id);

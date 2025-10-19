@@ -21,8 +21,8 @@ namespace wServer.realm.commands
 {
     internal class TestCommand : Command
     {
-        public TestCommand()
-            : base("t", 1)
+        public TestCommand(IServiceProvider services)
+            : base("t", 1, services)
         {
         }
 
@@ -46,8 +46,8 @@ namespace wServer.realm.commands
 
     internal class AddGiftCodeCommand : Command
     {
-        public AddGiftCodeCommand()
-            : base("gcode", 1)
+        public AddGiftCodeCommand(IServiceProvider services)
+            : base("gcode", 1, services)
         {
         }
 
@@ -72,8 +72,8 @@ namespace wServer.realm.commands
 
     internal class posCmd : Command
     {
-        public posCmd()
-            : base("p", 1)
+        public posCmd(IServiceProvider services)
+            : base("p", 1, services)
         {
         }
 
@@ -87,8 +87,9 @@ namespace wServer.realm.commands
     internal class BanCommand : Command
     {
         private readonly IAccountRepository _accounts;
-        public BanCommand(IAccountRepository accounts) :
-            base("ban", permLevel: 1)
+
+        public BanCommand(IAccountRepository accounts, IServiceProvider services) :
+            base("ban", 1, services)
         {
             _accounts = accounts;
         }
@@ -101,7 +102,7 @@ namespace wServer.realm.commands
                 player.SendError("Player not found");
                 return false;
             }
-            
+
             if (p.Client.Account.Banned)
             {
                 player.SendError("Player is already banned");
@@ -119,14 +120,14 @@ namespace wServer.realm.commands
 
     internal class AddWorldCommand : Command
     {
-        public AddWorldCommand()
-            : base("addworld", 1)
+        public AddWorldCommand(IServiceProvider services)
+            : base("addworld", 1, services)
         {
         }
 
         protected override Task<bool> Process(Player player, RealmTime time, string[] args)
         {
-            Task.Factory.StartNew(async () => await GameWorld.AutoNameAsync( 1, true))
+            Task.Factory.StartNew(async () => await GameWorld.AutoNameAsync(1, true))
                 .ContinueWith(_ => player.Manager.AddWorld(_.Result.Result), TaskScheduler.Default);
             return Task.FromResult(true);
         }
@@ -135,38 +136,40 @@ namespace wServer.realm.commands
     internal class PortalCommand : Command
     {
         private readonly RealmManager _realmManager;
-        public PortalCommand(RealmManager realmManager)
-            : base("portal", 1)
+
+        public PortalCommand(RealmManager realmManager, IServiceProvider services)
+            : base("portal", 1, services)
         {
             _realmManager = realmManager;
         }
 
         protected override Task<bool> Process(Player player, RealmTime time, string[] args)
         {
-            if(args.Length == 0)
+            if (args.Length == 0)
             {
                 player.SendHelp("Usage: /portal <worldname>");
                 return Task.FromResult(false);
             }
-            
+
             string name = string.Join(" ", args.ToArray()).Trim();
 
             Portal portalEntity;
             try
             {
                 portalEntity = Entity.Resolve(_realmManager, name) as Portal;
-            }catch(Exception)
+            }
+            catch (Exception)
             {
                 player.SendError("Unknown portal!");
                 return Task.FromResult(false);
             }
-            
+
             if (portalEntity == null)
             {
                 player.SendError("Unknown portal!");
                 return Task.FromResult(false);
             }
-            
+
             portalEntity.Move(player.X, player.Y);
             player.Owner.EnterWorld(portalEntity);
 
@@ -177,8 +180,8 @@ namespace wServer.realm.commands
 
     internal class SpawnCommand : Command
     {
-        public SpawnCommand()
-            : base("spawn", 1)
+        public SpawnCommand(IServiceProvider services)
+            : base("spawn", 1, services)
         {
         }
 
@@ -247,8 +250,8 @@ namespace wServer.realm.commands
 
     internal class AddEffCommand : Command
     {
-        public AddEffCommand()
-            : base("addeff", 1)
+        public AddEffCommand(IServiceProvider services)
+            : base("addeff", 1, services)
         {
         }
 
@@ -283,8 +286,8 @@ namespace wServer.realm.commands
 
     internal class RemoveEffCommand : Command
     {
-        public RemoveEffCommand()
-            : base("remeff", 1)
+        public RemoveEffCommand(IServiceProvider services)
+            : base("remeff", 1, services)
         {
         }
 
@@ -317,8 +320,8 @@ namespace wServer.realm.commands
 
     internal class GiveCommand : Command
     {
-        public GiveCommand()
-            : base("give", 1)
+        public GiveCommand(IServiceProvider services)
+            : base("give", 1, services)
         {
         }
 
@@ -333,7 +336,8 @@ namespace wServer.realm.commands
             string name = string.Join(" ", args.ToArray()).Trim();
             ushort objType;
             //creates a new case insensitive dictionary based on the XmlDatas
-            Dictionary<string, ushort> icdatas = new Dictionary<string, ushort>(player.Manager.GameDataService.IdToObjectType,
+            Dictionary<string, ushort> icdatas = new Dictionary<string, ushort>(
+                player.Manager.GameDataService.IdToObjectType,
                 StringComparer.OrdinalIgnoreCase);
             if (!icdatas.TryGetValue(name, out objType))
             {
@@ -365,8 +369,8 @@ namespace wServer.realm.commands
 
     internal class TpCommand : Command
     {
-        public TpCommand()
-            : base("tp", 1)
+        public TpCommand(IServiceProvider services)
+            : base("tp", 1, services)
         {
         }
 
@@ -443,8 +447,8 @@ namespace wServer.realm.commands
 
     internal class Kick : Command
     {
-        public Kick()
-            : base("kick", 1)
+        public Kick(IServiceProvider services)
+            : base("kick", 1, services)
         {
         }
 
@@ -480,8 +484,9 @@ namespace wServer.realm.commands
     internal class Mute : Command
     {
         private readonly IAccountRepository _accounts;
-        public Mute(IAccountRepository accounts)
-            : base("mute", 1)
+
+        public Mute(IAccountRepository accounts, IServiceProvider services)
+            : base("mute", 1, services)
         {
             _accounts = accounts;
         }
@@ -519,8 +524,8 @@ namespace wServer.realm.commands
 
     internal class Max : Command
     {
-        public Max()
-            : base("max", 1)
+        public Max(IServiceProvider services)
+            : base("max", 1, services)
         {
         }
 
@@ -554,8 +559,9 @@ namespace wServer.realm.commands
     internal class UnMute : Command
     {
         private readonly IAccountRepository _accounts;
-        public UnMute(IAccountRepository accounts)
-            : base("unmute", 1)
+
+        public UnMute(IAccountRepository accounts, IServiceProvider services)
+            : base("unmute", 1, services)
         {
         }
 
@@ -592,8 +598,8 @@ namespace wServer.realm.commands
 
     internal class OryxSay : Command
     {
-        public OryxSay()
-            : base("osay", 1)
+        public OryxSay(IServiceProvider services)
+            : base("osay", 1, services)
         {
         }
 
@@ -613,8 +619,8 @@ namespace wServer.realm.commands
 
     internal class SWhoCommand : Command //get all players from all worlds (this may become too large!)
     {
-        public SWhoCommand()
-            : base("swho", 1)
+        public SWhoCommand(IServiceProvider services)
+            : base("swho", 1, services)
         {
         }
 
@@ -648,8 +654,8 @@ namespace wServer.realm.commands
 
     internal class Announcement : Command
     {
-        public Announcement()
-            : base("announce", 1)
+        public Announcement(IServiceProvider services)
+            : base("announce", 1, services)
         {
         }
 
@@ -680,8 +686,8 @@ namespace wServer.realm.commands
 
     internal class Summon : Command
     {
-        public Summon()
-            : base("summon", 1)
+        public Summon(IServiceProvider services)
+            : base("summon", 1, services)
         {
         }
 
@@ -737,8 +743,8 @@ namespace wServer.realm.commands
 
     internal class KillPlayerCommand : Command
     {
-        public KillPlayerCommand()
-            : base("kill", 1)
+        public KillPlayerCommand(IServiceProvider services)
+            : base("kill", 1, services)
         {
         }
 
@@ -762,8 +768,8 @@ namespace wServer.realm.commands
 
     internal class RestartCommand : Command
     {
-        public RestartCommand()
-            : base("restart", 1)
+        public RestartCommand(IServiceProvider services)
+            : base("restart", 1, services)
         {
         }
 
@@ -1206,8 +1212,8 @@ namespace wServer.realm.commands
 
     internal class TqCommand : Command
     {
-        public TqCommand()
-            : base("tq", 1)
+        public TqCommand(IServiceProvider services)
+            : base("tq", 1, services)
         {
         }
 
@@ -1294,8 +1300,8 @@ namespace wServer.realm.commands
 
     internal class LevelCommand : Command
     {
-        public LevelCommand()
-            : base("level", 1)
+        public LevelCommand(IServiceProvider services)
+            : base("level", 1, services)
         {
         }
 
@@ -1329,8 +1335,8 @@ namespace wServer.realm.commands
 
     internal class SetCommand : Command
     {
-        public SetCommand()
-            : base("setStat", 1)
+        public SetCommand(IServiceProvider services)
+            : base("setStat", 1, services)
         {
         }
 
@@ -1479,8 +1485,8 @@ namespace wServer.realm.commands
 
     internal class SetpieceCommand : Command
     {
-        public SetpieceCommand()
-            : base("setpiece", 1)
+        public SetpieceCommand(IServiceProvider services)
+            : base("setpiece", 1, services)
         {
         }
 
@@ -1495,7 +1501,8 @@ namespace wServer.realm.commands
 
     internal class ListCommands : Command
     {
-        public ListCommands() : base("commands", permLevel: 1)
+        public ListCommands(IServiceProvider services)
+            : base("commands", permLevel: 1, services)
         {
         }
 

@@ -1,6 +1,8 @@
 ﻿using db;
 using wServer.networking;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using wServer;
 using db.Repositories;
 
 namespace wServer.realm.worlds
@@ -10,7 +12,8 @@ namespace wServer.realm.worlds
         public string Guild { get; set; }
         public int GuildLevel { get; set; }
 
-        public GuildHall(string guild, RealmManager manager = null) : base(manager)
+        public GuildHall(string guild, RealmManager manager = null, ILogger<World> logger = null,
+            RealmPortalMonitor portalMonitor = null, GeneratorCache generatorCache = null) : base(manager, logger, portalMonitor, generatorCache)
         {
             Id = GUILD_ID;
             Guild = guild;

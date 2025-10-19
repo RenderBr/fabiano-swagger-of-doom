@@ -1,17 +1,12 @@
-﻿using db;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
-using wServer.realm.entities;
 using wServer.realm.worlds;
 
 namespace wServer.networking.handlers
 {
-    internal class PetCommandHandler : PacketHandlerBase<PetCommandPacket>
+    internal class PetCommandHandler(IServiceProvider serviceProvider) : PacketHandlerBase<PetCommandPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -33,8 +28,8 @@ namespace wServer.networking.handlers
                             if (client.Player.Pet != null) client.Player.Pet.PlayerOwner = null;
                             client.Player.Pet = pet;
                             pet.PlayerOwner = client.Player;
-                                // Update character petId via repository
-                                // Note: This needs proper character update implementation
+                            // Update character petId via repository
+                            // Note: This needs proper character update implementation
                             client.SendPacket(new UpdatePetPacket
                             {
                                 PetId = pet.PetId
@@ -42,7 +37,7 @@ namespace wServer.networking.handlers
                             client.Player.SaveToCharacter();
                             break;
                         case PetCommandPacket.UNFOLLOW_PET:
-                                // Update character to unfollow pet via repository
+                            // Update character to unfollow pet via repository
                             client.Player.Pet.PlayerOwner = null;
                             client.Player.Pet = null;
                             client.SendPacket(new UpdatePetPacket
@@ -51,7 +46,7 @@ namespace wServer.networking.handlers
                             });
                             break;
                         case PetCommandPacket.RELEASE_PET:
-                                // Delete pet via repository
+                            // Delete pet via repository
                             client.SendPacket(new RemovePetFromListPacket
                             {
                                 PetId = pet.PetId

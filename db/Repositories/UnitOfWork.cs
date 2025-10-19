@@ -1,8 +1,6 @@
-using System;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore.Storage;
-using db.Models;
-using db.Repositories;
+using Microsoft.Extensions.Logging;
 
 namespace db.Repositories;
 
@@ -24,9 +22,12 @@ public class UnitOfWork : IUnitOfWork
     private IBackpackRepository _backpacks;
     private IGiftCodeRepository _giftCodes;
 
-    public UnitOfWork(ServerDbContext context)
+    private readonly ILogger<UnitOfWork> _logger;
+    public UnitOfWork(ServerDbContext context, ILogger<UnitOfWork> logger)
     {
         _context = context;
+        _logger = logger;
+        _logger.LogInformation("UnitOfWork initialized.");
     }
 
     public IAccountRepository Accounts => _accounts ??= new AccountRepository(_context);
@@ -75,6 +76,8 @@ public class UnitOfWork : IUnitOfWork
 
     public void Dispose()
     {
+        _logger.LogInformation("UnitOfWork disposing.");
+
         _context.Dispose();
         if (_transaction != null)
         {

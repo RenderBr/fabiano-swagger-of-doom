@@ -16,7 +16,8 @@ using wServer.realm.worlds;
 
 namespace wServer.networking.handlers
 {
-    internal class InvDropHandler : PacketHandlerBase<InvDropPacket>
+    internal class InvDropHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<InvDropPacket>(serviceProvider)
     {
         private readonly Random invRand = new Random();
 
@@ -106,7 +107,7 @@ namespace wServer.networking.handlers
                     }
                     catch (Exception ex)
                     {
-                        var logger = Program.Services.GetRequiredService<ILogger<InvDropHandler>>();
+                        var logger = serviceProvider.GetRequiredService<ILogger<InvDropHandler>>();
                         logger.LogError(ex, "{PlayerName} just attempted to dupe.", client.Player.Name);
                     }
                 }

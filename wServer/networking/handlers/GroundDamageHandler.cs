@@ -12,7 +12,7 @@ using wServer.realm;
 
 namespace wServer.networking.handlers
 {
-    internal class GroundDamageHandler : PacketHandlerBase<GroundDamagePacket>
+    internal class GroundDamageHandler(IServiceProvider serviceProvider) : PacketHandlerBase<GroundDamagePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -49,7 +49,7 @@ namespace wServer.networking.handlers
                 }
                 catch (Exception ex)
                 {
-                    Program.Services.GetRequiredService<ILogger<GroundDamageHandler>>()
+                    ServiceProvider.GetRequiredService<ILogger<GroundDamageHandler>>()
                         .LogError(ex, "Error in GroundDamageHandler");
                 }
             }, PendingPriority.Networking);

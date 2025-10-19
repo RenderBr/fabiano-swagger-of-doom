@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
@@ -12,11 +11,9 @@ using wServer.networking.svrPackets;
 using wServer.realm;
 using wServer.realm.entities.player;
 using System.Threading.Tasks;
-using db.JsonObjects;
 using db.Models;
 using RageRealm.Shared.Models;
-using RotMG.Common.Networking;
-using FailurePacket = wServer.networking.cliPackets.FailurePacket;
+using wServer.Factories;
 
 #endregion
 
@@ -39,12 +36,16 @@ namespace wServer.networking
         public uint UpdateAckCount = 0;
 
         private NetworkHandler handler;
+        IServiceProvider _serviceProvider;
+        INetworkHandlerFactory _networkHandlerFactory;
 
-        public Client(RealmManager manager, Socket skt)
+        public Client(IServiceProvider serviceProvider, Socket skt)
         {
-            log = Program.Services?.GetRequiredService<ILogger<Client>>();
+            _serviceProvider = serviceProvider;
+            log = serviceProvider.GetRequiredService<ILogger<Client>>();
+            Manager = serviceProvider.GetRequiredService<RealmManager>();
+            _networkHandlerFactory = serviceProvider.GetRequiredService<INetworkHandlerFactory>();
             Socket = skt;
-            Manager = manager;
             ReceiveKey =
                 new RC4([0x31, 0x1f, 0x80, 0x69, 0x14, 0x51, 0xc7, 0x1d, 0x09, 0xa1, 0x3a, 0x2a, 0x6e]);
             SendKey = new RC4([0x72, 0xc5, 0x58, 0x3c, 0xaf, 0xb6, 0x81, 0x89, 0x95, 0xcd, 0xd7, 0x4b, 0x80]);
@@ -89,7 +90,7 @@ namespace wServer.networking
         public void BeginProcess()
         {
             log?.LogInformation("Received client @ {endPoint}", Socket.RemoteEndPoint);
-            handler = new NetworkHandler(this, Socket);
+            handler = _networkHandlerFactory.CreateNetworkHandler(_serviceProvider, this, Socket);
             handler.BeginHandling();
         }
 
@@ -128,8 +129,10 @@ namespace wServer.networking
                 }
 
                 if (pkt.ID == (PacketID)255) return;
+
+                var packetHandlers = _serviceProvider.GetRequiredService<PacketHandlers>();
                 IPacketHandler handler;
-                if (!PacketHandlers.Handlers.TryGetValue(pkt.ID, out handler))
+                if (!packetHandlers.Handlers.TryGetValue(pkt.ID, out handler))
                     log?.LogWarning("Unhandled packet '{packetId}'", pkt.ID);
                 else
                 {

@@ -45,7 +45,7 @@ namespace db.data
         {
             string path = "data";
             _log = logger;
-            
+
             ObjectTypeToElement = new ReadOnlyDictionary<ushort, XElement>(
                 type2elem_obj = new Dictionary<ushort, XElement>());
 
@@ -87,12 +87,15 @@ namespace db.data
             for (int i = 0; i < xmls.Length; i++)
             {
                 _log.LogInformation("Loading '{XmlItem}'({Current}/{Total})...", xmls[i], i + 1, xmls.Length);
-                using (Stream stream = File.OpenRead(xmls[i]))
-                    ProcessXml(XElement.Load(stream));
+                using Stream stream = File.OpenRead(xmls[i]);
+                ProcessXml(XElement.Load(stream));
             }
+
             StringBuilder sb = new StringBuilder();
             sb.AppendLine("XML Game data loaded from " + xmls.Length + " files:");
-            sb.AppendLine($"| {items.Count} items | {tiles.Count} tiles | {objDescs.Count} objects | {addition.Elements().Count()} additions");
+            sb.AppendLine(
+                $"| {items.Count} items | {tiles.Count} tiles | {objDescs.Count} objects | {addition.Elements().Count()} additions");
+            _log.LogInformation(sb.ToString());
         }
 
         private static string AssemblyDirectory
@@ -118,7 +121,7 @@ namespace db.data
         public IDictionary<ushort, PetStruct> TypeToPet { get; private set; }
         public IDictionary<string, PetSkin> IdToPetSkin { get; private set; }
         public IDictionary<ushort, SetTypeSkin> SetTypeSkins { get; private set; }
-        
+
 
         public string[] AdditionXml
         {
@@ -174,9 +177,11 @@ namespace db.data
                 if (cls == "PetBehavior" || cls == "PetAbility") continue;
 
                 if (type2id_obj.ContainsKey(type))
-                    _log.LogWarning("'{FirstId}' and '{SecondID}' has the same ID of 0x{Type:x4}!", id, type2id_obj[type], type);
+                    _log.LogWarning("'{FirstId}' and '{SecondID}' has the same ID of 0x{Type:x4}!", id,
+                        type2id_obj[type], type);
                 if (id2type_obj.ContainsKey(id))
-                    _log.LogWarning("0x{FirstId:x4} and 0x{SecondId:x4} has the same name of {ID}!", type, id2type_obj[id], id);
+                    _log.LogWarning("0x{FirstId:x4} and 0x{SecondId:x4} has the same name of {ID}!", type,
+                        id2type_obj[id], id);
 
                 type2id_obj[type] = id;
                 id2type_obj[id] = type;
@@ -196,10 +201,11 @@ namespace db.data
                         }
                         catch
                         {
-                            Console.WriteLine("Error for portal: " + type + " id: " + id);
-                            /*3392,1792,1795,1796,1805,1806,1810,1825 -- no location, assume nexus?* 
-        *  Tomb Portal of Cowardice,  Dungeon Portal,  Portal of Cowardice,  Realm Portal,  Glowing Portal of Cowardice,  Glowing Realm Portal,  Nexus Portal,  Locked Wine Cellar Portal*/
+                            _log.LogWarning("Error for portal: {Type}, ID: {ID}", type, id);
+                            /*3392,1792,1795,1796,1805,1806,1810,1825 -- no location, assume nexus?*
+                             *  Tomb Portal of Cowardice,  Dungeon Portal,  Portal of Cowardice,  Realm Portal,  Glowing Portal of Cowardice,  Glowing Realm Portal,  Nexus Portal,  Locked Wine Cellar Portal*/
                         }
+
                         break;
                     case "Pet":
                         type2pet[type] = new PetStruct(type, elem);
@@ -226,7 +232,7 @@ namespace db.data
                 }
             }
         }
-        
+
         public Item GetItem(ushort type)
         {
             Item item;
@@ -238,6 +244,7 @@ namespace db.data
             _log.LogWarning("Item not found: {Type}", type);
             return null;
         }
+
         public void AddGrounds(XElement root)
         {
             foreach (XElement elem in root.XPathSelectElements("//Ground"))
@@ -252,9 +259,11 @@ namespace db.data
                     type = (ushort)Utils.FromString(typeAttr.Value);
 
                 if (type2id_tile.ContainsKey(type))
-                    _log.LogWarning("'{FirstID}' and '{SecondID}' has the same ID of 0x{Type:x4}!", id, type2id_tile[type], type);
+                    _log.LogWarning("'{FirstID}' and '{SecondID}' has the same ID of 0x{Type:x4}!", id,
+                        type2id_tile[type], type);
                 if (id2type_tile.ContainsKey(id))
-                    _log.LogWarning("0x{FirstType:x4} and 0x{SecondType:x4} has the same name of {ID}!", type, id2type_tile[id], id);
+                    _log.LogWarning("0x{FirstType:x4} and 0x{SecondType:x4} has the same name of {ID}!", type,
+                        id2type_tile[id], id);
 
                 type2id_tile[type] = id;
                 id2type_tile[id] = type;
@@ -283,7 +292,7 @@ namespace db.data
         {
             if (prevUpdateCount != updateCount)
             {
-                addXml = new[] {addition.ToString()};
+                addXml = new[] { addition.ToString() };
                 prevUpdateCount = updateCount;
             }
         }
@@ -320,9 +329,11 @@ namespace db.data
                         type = nextSignedId++;
                         SetValue("nextSigned", nextSignedId.ToString());
                     }
+
                     SetValue(id, type.ToString());
                     _log.LogInformation("Auto assigned '{ID}' to 0x{Type:x4}", id, type);
                 }
+
                 return type;
             }
         }

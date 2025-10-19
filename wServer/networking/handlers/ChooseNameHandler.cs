@@ -12,7 +12,8 @@ using wServer.networking.svrPackets;
 
 namespace wServer.networking.handlers
 {
-    internal class ChooseNameHandler : PacketHandlerBase<ChooseNamePacket>
+    internal class ChooseNameHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<ChooseNamePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -21,7 +22,17 @@ namespace wServer.networking.handlers
 
         protected override async Task HandlePacket(Client client, ChooseNamePacket packet)
         {
-            string[] bannednames = { "Dick", "Fuck", "Pussy", "Cunt", "Bitch", "Nigger", "Nigga", "Niqqa", "Cunt", "Shit", "Penis", "Vagina", "Chent", "Niqqer", "Negro", "Ngr", "Chink", "Fag", "Faggot", "Fgt", "Fagot", "Fagit", "Ass", "Autistic", "Autism", "Schlong", "vag", "damn", "tits", "tlts", "retard", "asd", "Kalle", "Kaile", "Kalie", "xDalla", "xDalia", "xDaila", "McFarvo", "Pixl", "TheHangman", "White", "DrMini", "TEEBQNE", "TBQNEE", "FloFlorian", "Lore", "Dalla", "Daila", "Dalia", "Clocking", "Ciocking", "IArkani", "lArkani", "BunnyBomb", "Liinkii", "Gamingland", "GamingIand", "TheRegal", "TheRegaI", "ParagonX", "Cantplay", "Billyhendr", "Nilly", "Trapped", "Botmaker", "JustANoob", "JustANoobROTMG", "Niiiy", "niily", "niliy", "Lucifer", "Kithio", "Case", "Travoos", "XD", "DX", "Trol", "Troll", "lol", "lel", "OMG", "suck" };
+            string[] bannednames =
+            {
+                "Dick", "Fuck", "Pussy", "Cunt", "Bitch", "Nigger", "Nigga", "Niqqa", "Cunt", "Shit", "Penis", "Vagina",
+                "Chent", "Niqqer", "Negro", "Ngr", "Chink", "Fag", "Faggot", "Fgt", "Fagot", "Fagit", "Ass", "Autistic",
+                "Autism", "Schlong", "vag", "damn", "tits", "tlts", "retard", "asd", "Kalle", "Kaile", "Kalie",
+                "xDalla", "xDalia", "xDaila", "McFarvo", "Pixl", "TheHangman", "White", "DrMini", "TEEBQNE", "TBQNEE",
+                "FloFlorian", "Lore", "Dalla", "Daila", "Dalia", "Clocking", "Ciocking", "IArkani", "lArkani",
+                "BunnyBomb", "Liinkii", "Gamingland", "GamingIand", "TheRegal", "TheRegaI", "ParagonX", "Cantplay",
+                "Billyhendr", "Nilly", "Trapped", "Botmaker", "JustANoob", "JustANoobROTMG", "Niiiy", "niily", "niliy",
+                "Lucifer", "Kithio", "Case", "Travoos", "XD", "DX", "Trol", "Troll", "lol", "lel", "OMG", "suck"
+            };
 
             foreach (string i in bannednames)
             {

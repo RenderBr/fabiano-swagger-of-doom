@@ -1,5 +1,6 @@
 using db;
 using db.data;
+using db.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,23 +11,21 @@ namespace wServer.Services;
 
 public static class DataServiceCollectionExtensions
 {
-    public static IServiceCollection AddDataServices(this IServiceCollection services, IConfiguration _config)
+    public static IServiceCollection AddDataServices(this IServiceCollection services, IConfiguration config)
     {
-        var config = _config.Get<WorldServerConfiguration>();
-        
+        var configuration = config.Get<WorldServerConfiguration>();
+
         var connString =
-            $"server={config.Database.Host};userid={config.Database.User};password={config.Database.Password};" +
-            $"database={config.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
+            $"server={configuration.Database.Host};userid={configuration.Database.User};password={configuration.Database.Password};" +
+            $"database={configuration.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
 
         services.AddDbContext<ServerDbContext>(options =>
         {
             options.UseMySql(connString, ServerVersion.AutoDetect(connString));
         });
-        
-        services.AddSingleton<DatabaseAdapter>();
-        services.AddSingleton<GeneratorCache>();
 
+        services.AddSingleton<IUnitOfWork, UnitOfWork>();
+        services.AddSingleton<DatabaseAdapter>();
         return services;
     }
-
 }

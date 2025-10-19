@@ -51,14 +51,18 @@ namespace wServer.realm
         private bool _canBeClosed;
         public RealmManager Manager { get; internal set; }
 
-        protected World(RealmManager manager)
+        internal ILogger<World> Logger => _logger;
+        internal RealmPortalMonitor PortalMonitor => _portalMonitor;
+        internal GeneratorCache GeneratorCache => _generatorCache;
+
+        protected World(RealmManager manager, ILogger<World> logger,
+            RealmPortalMonitor portalMonitor, GeneratorCache generatorCache)
         {
-            var scope = Program.Services.CreateScope();
             Manager = manager;
-            _logger = scope.ServiceProvider.GetRequiredService<ILogger<World>>();
-            _portalMonitor = scope.ServiceProvider.GetService<RealmPortalMonitor>();
-            _generatorCache = scope.ServiceProvider.GetService<GeneratorCache>();
-            
+            _logger = logger;
+            _portalMonitor = portalMonitor;
+            _generatorCache = generatorCache;
+
             Players = new ConcurrentDictionary<int, Player>();
             Enemies = new ConcurrentDictionary<int, Enemy>();
             Quests = new ConcurrentDictionary<int, Enemy>();
@@ -70,7 +74,9 @@ namespace wServer.realm
             AllowTeleport = true;
             ShowDisplays = true;
             MaxPlayers = 85;
-
+            Seed = manager.Random.NextUInt32();
+            PortalKey = Utils.RandomBytes(NeedsPortalKey ? 16 : 0);
+            
             // mark world for cleanup after 2 minutes if empty
             Timers.Add(new WorldTimer(120 * 1000, (w, t) =>
             {
@@ -135,6 +141,7 @@ namespace wServer.realm
         public ConcurrentDictionary<int, Enemy> Quests { get; }
 
         public virtual World GetInstance(Client psr) => null;
+        public string Uuid { get; set; } = Guid.NewGuid().ToString();
 
         #region Passability and entity helpers
 
@@ -192,15 +199,15 @@ namespace wServer.realm
                 return enemy;
             if (StaticObjects.TryGetValue(id, out var staticObj))
                 return staticObj;
-            if(Projectiles.Any(k => k.Key.Item1 == id) && 
+            if (Projectiles.Any(k => k.Key.Item1 == id) &&
                 Projectiles.TryGetValue(
                     Projectiles.Keys.FirstOrDefault(k => k.Item1 == id), out var projectile))
-                return projectile; 
+                return projectile;
             return Pets.GetValueOrDefault(id);
         }
 
         public bool IsFull => Players.Count >= MaxPlayers;
-        
+
         /// <summary>
         /// Broadcast a packet to all players in the world (optionally nearby the source entity)
         /// </summary>
@@ -228,14 +235,14 @@ namespace wServer.realm
                     p.Client.SendPacket(pkt);
             }
         }
-        
+
         public Player? GetPlayerByName(string name)
         {
-            return Players.Values.FirstOrDefault(p => 
+            return Players.Values.FirstOrDefault(p =>
                 string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        
+
         public void ChatReceived(Player from, string text)
         {
             var packet = new TextPacket
@@ -252,7 +259,7 @@ namespace wServer.realm
             BroadcastPacket(packet, from);
         }
 
-        
+
         private void FromWorldMap(Stream dat)
         {
             var logger = Program.Services?.GetRequiredService<ILogger<Wmap>>();
@@ -385,6 +392,7 @@ namespace wServer.realm
                 {
                     p?.Tick(time);
                 }
+
                 foreach (var pet in Pets.Values) pet.Tick(time);
 
                 if (EnemiesCollision != null)
@@ -446,7 +454,8 @@ namespace wServer.realm
                     }
                     catch (Exception e)
                     {
-                        _logger?.LogError(e, "Error adding player {PlayerName} to world {WorldName}", player.Name, Name);
+                        _logger?.LogError(e, "Error adding player {PlayerName} to world {WorldName}", player.Name,
+                            Name);
                     }
 
                     break;
@@ -507,7 +516,8 @@ namespace wServer.realm
             {
                 case Player player:
                     if (!Players.TryRemove(player.Id, out _))
-                        _logger?.LogWarning("Could not remove player {PlayerName} from world {WorldName}", player.Name, Name);
+                        _logger?.LogWarning("Could not remove player {PlayerName} from world {WorldName}", player.Name,
+                            Name);
                     PlayersCollision.Remove(player);
                     break;
 

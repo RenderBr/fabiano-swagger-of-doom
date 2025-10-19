@@ -9,34 +9,34 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace server.account
 {
-	internal class checkGiftCode : RequestHandler
-	{
-		protected override async Task HandleRequest()
-		{
-			var scope = Program.Services.CreateScope();
-			var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+    internal class checkGiftCode : RequestHandler
+    {
+        protected override async Task HandleRequest()
+        {
+            var scope = Program.Services.CreateScope();
+            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
 
-			string jsonCode = String.Empty;
-			string status = "Invalid code.";
-			var giftCode = await unitOfWork.GiftCodes.GetByCodeAsync(Query["code"]);
-			if (giftCode != null)
-			{
-				jsonCode = giftCode.Content;
-			}
+            string jsonCode = String.Empty;
+            string status = "Invalid code.";
+            var giftCode = await unitOfWork.GiftCodes.GetByCodeAsync(Query["code"]);
+            if (giftCode != null)
+            {
+                jsonCode = giftCode.Content;
+            }
 
-			var list = ParseContents(jsonCode);
-			if (list.Count > 0)
-			{
-				status = String.Empty;
-				foreach (var i in list)
-					status += (i + "</br>");
-			}
+            var list = ParseContents(jsonCode);
+            if (list.Count > 0)
+            {
+                status = String.Empty;
+                foreach (var i in list)
+                    status += (i + "</br>");
+            }
 
-			byte[] res = new byte[0];
-			if (status.IsNullOrWhiteSpace() || status == "Invalid code.")
-			{
-				res = Encoding.UTF8.GetBytes(
-$@"<html>
+            byte[] res = new byte[0];
+            if (status.IsNullOrWhiteSpace() || status == "Invalid code.")
+            {
+                res = Encoding.UTF8.GetBytes(
+                    $@"<html>
 	<head>
 		<title>Check Giftcode</title>
 	</head>
@@ -46,11 +46,11 @@ $@"<html>
 		</h1>
 	</body>
 </html>");
-			}
-			else
-			{
-				res = Encoding.UTF8.GetBytes(
-$@"<html>
+            }
+            else
+            {
+                res = Encoding.UTF8.GetBytes(
+                    $@"<html>
 	<head>
 		<title>Check Giftcode</title>
 	</head>
@@ -63,34 +63,36 @@ $@"<html>
 		</h3>
 	</body>
 </html>");
-			}
+            }
 
-			Context.Response.OutputStream.Write(res, 0, res.Length);
-		}
+            Context.Response.OutputStream.Write(res, 0, res.Length);
+        }
 
-		private List<string> ParseContents(string json)
-		{
+        private List<string> ParseContents(string json)
+        {
             var code = GiftCode.FromJson(json);
-			List<string> ret = new List<string>();
+            List<string> ret = new List<string>();
             if (code == null) return ret;
             var added = new List<int>();
 
-            if(code.Fame != 0)
+            if (code.Fame != 0)
                 ret.Add($"Fame: {code.Fame}");
-            if(code.Gold != 0)
+            if (code.Gold != 0)
                 ret.Add($"Gold: {code.Gold}");
             if (code.VaultChests != 0)
                 ret.Add($"Vault Chest{(code.VaultChests > 1 ? "s" : String.Empty)}: {code.VaultChests}");
             if (code.CharSlots != 0)
                 ret.Add($"Char Slot{(code.CharSlots > 1 ? "s" : String.Empty)}: {code.CharSlots}");
 
-            foreach(var item in code.Gifts)
+            foreach (var item in code.Gifts)
                 if (!added.Contains(item))
                 {
-                    ret.Add($"{code.Gifts.Count(_ => _ == item)} {Program.GameDataService.Items[(ushort)item].ObjectId}");
+                    ret.Add(
+                        $"{code.Gifts.Count(_ => _ == item)} {Program.GameDataService.Items[(ushort)item].ObjectId}");
                     added.Add(item);
                 }
+
             return ret;
-		}
-	}
+        }
+    }
 }

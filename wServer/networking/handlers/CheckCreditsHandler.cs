@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using db;
 using RageRealm.Shared.Models;
@@ -10,7 +11,7 @@ using wServer.realm;
 
 namespace wServer.networking.handlers
 {
-    internal class CheckCreditsHandler : PacketHandlerBase<CheckCreditsPacket>
+    internal class CheckCreditsHandler(IServiceProvider serviceProvider) : PacketHandlerBase<CheckCreditsPacket>(serviceProvider)
     {
         public override PacketID ID
         {

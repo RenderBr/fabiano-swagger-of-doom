@@ -1,20 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
-using wServer.networking.svrPackets;
-using db;
-using wServer.realm.entities;
-using wServer.realm.entities.player;
+using Microsoft.Extensions.Logging;
 
 namespace wServer.networking.handlers
 {
-    class JoinGuildPacketHandler : PacketHandlerBase<JoinGuildPacket>
+    class JoinGuildPacketHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<JoinGuildPacket>(serviceProvider)
     {
-        public override PacketID ID { get { return PacketID.JOINGUILD; } }
+        public override PacketID ID
+        {
+            get { return PacketID.JOINGUILD; }
+        }
 
         protected override Task HandlePacket(Client client, JoinGuildPacket packet)
         {
@@ -24,7 +23,7 @@ namespace wServer.networking.handlers
 
         void Handle(Client client, JoinGuildPacket packet)
         {
-            if(!client.Player.Invited)
+            if (!client.Player.Invited)
             {
                 client.Player.SendInfoWithTokens("server.guild_not_invited", new KeyValuePair<string, object>[1]
                 {
@@ -32,6 +31,7 @@ namespace wServer.networking.handlers
                 });
                 return;
             }
+
             client.Manager.Database.DoActionAsync(async db =>
             {
                 var gStruct = await db.GetGuild(packet.GuildName).ConfigureAwait(false);
@@ -39,6 +39,7 @@ namespace wServer.networking.handlers
                 {
                     client.Player.SendInfo("You need to be invited to join a guild!");
                 }
+
                 if (gStruct != null)
                 {
                     var g = await db.ChangeGuildAsync(client.Account, gStruct.Id, 0, 0, false).ConfigureAwait(false);

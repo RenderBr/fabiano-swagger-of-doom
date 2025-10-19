@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using db;
 using db.Repositories;
@@ -15,19 +16,23 @@ using FailurePacket = wServer.networking.svrPackets.FailurePacket;
 
 namespace wServer.networking.handlers
 {
-    internal class LoadHandler : PacketHandlerBase<LoadPacket>
+    internal class LoadHandler(IServiceProvider serviceProvider) : PacketHandlerBase<LoadPacket>(serviceProvider)
     {
         public override PacketID ID => PacketID.LOAD;
 
         protected override async Task HandlePacket(Client client, LoadPacket packet)
         {
-            using var scope = Program.Services.CreateScope();
+            using var scope = ServiceProvider.CreateScope();
             var characterRepository = scope.ServiceProvider.GetRequiredService<ICharacterRepository>();
 
-            var character = await characterRepository.GetByCharacterIdAsync(long.Parse(client.Account.AccountId), packet.CharacterId);
+            var character =
+                await characterRepository.GetByCharacterIdAsync(long.Parse(client.Account.AccountId),
+                    packet.CharacterId);
             if (character == null || character.Dead)
             {
-                Program.Logger.LogError("Character not found or dead. AccountId: {AccountAccountId}, CharacterId: {PacketCharacterId}", client.Account.AccountId, packet.CharacterId);
+                ServiceProvider.GetRequiredService<ILogger<LoadHandler>>().LogError(
+                    "Character not found or dead. AccountId: {AccountAccountId}, CharacterId: {PacketCharacterId}",
+                    client.Account.AccountId, packet.CharacterId);
                 client.SendPacket(new FailurePacket
                 {
                     ErrorDescription = "Character not found or dead."
@@ -35,7 +40,7 @@ namespace wServer.networking.handlers
                 client.Disconnect();
                 return;
             }
-            
+
             client.Character = Char.FromCharacter(character);
             var world = client.Manager.Worlds[client.TargetWorld];
 
@@ -51,5 +56,4 @@ namespace wServer.networking.handlers
             client.Stage = ProtocalStage.Ready;
         }
     }
-
 }

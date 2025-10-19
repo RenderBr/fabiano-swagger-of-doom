@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using RageRealm.Shared.Models;
@@ -10,7 +11,7 @@ using wServer.realm;
 
 namespace wServer.networking.handlers
 {
-    internal class ReskinHandler : PacketHandlerBase<ReskinPacket>
+    internal class ReskinHandler(IServiceProvider serviceProvider) : PacketHandlerBase<ReskinPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -35,6 +36,7 @@ namespace wServer.networking.handlers
                     else
                         client.Player.SendError("You do not have this skin");
                 }
+
                 client.Player.UpdateCount++;
                 client.Player.SaveToCharacter();
                 client.Save();

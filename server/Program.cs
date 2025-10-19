@@ -23,8 +23,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MimeKit;
-using Newtonsoft.Json;
 using RageRealm.Shared.Configuration.WebServer;
+using Serilog;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 #endregion
 
@@ -74,18 +75,11 @@ namespace server
                 $"database={Config.Database.Name};AllowPublicKeyRetrieval=True;SslMode=none;Convert Zero Datetime=True;";
             serviceBuilder.AddDbContext<ServerDbContext>(options =>
                 options.UseMySql(connString, ServerVersion.AutoDetect(connString)));
-
             
             // Initialize Logging Service
             serviceBuilder.AddLogging(builder =>
             {
                 builder.ClearProviders();
-
-                builder.AddSimpleConsole(options =>
-                {
-                    options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
-                    options.IncludeScopes = true;
-                });
                 
                 if (!Enum.TryParse(Config.Logging.LogLevel, true, out LogLevel logLevel))
                 {
@@ -103,11 +97,11 @@ namespace server
                 {
                     builder.AddDebug();
                 }
-
-                if (Config.Logging.EnableFile && !string.IsNullOrEmpty(Config.Logging.FilePath))
-                {
-                    builder.AddFile(Config.Logging.FilePath);
-                }
+                //
+                // if (Config.Logging.EnableFile && !string.IsNullOrEmpty(Config.Logging.FilePath))
+                // {
+                //     builder.AddFile(Config.Logging.FilePath);
+                // }
             });
 
             // Register Unit of Work and Services

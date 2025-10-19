@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
 using RageRealm.Shared.Models;
+using wServer;
 using wServer.networking;
 using wServer.realm.entities;
 
@@ -25,7 +26,9 @@ namespace wServer.realm.worlds
         private Client psr;
         public string AccountId { get; private set; }
 
-        public Vault(bool isLimbo, Client psr = null, RealmManager manager = null) : base(manager ?? psr?.Manager)
+        public Vault(bool isLimbo, Client psr = null, RealmManager manager = null,
+            ILogger<World> logger = null, RealmPortalMonitor portalMonitor = null, GeneratorCache generatorCache = null)
+            : base(manager ?? psr?.Manager, logger, portalMonitor, generatorCache)
         {
             Id = VAULT_ID;
             Name = "Vault";

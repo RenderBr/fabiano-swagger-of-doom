@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -32,6 +33,7 @@ namespace wServer.networking.cliPackets
 
         protected override void Read(Client psr, NReader rdr)
         {
+            var rsaService = Program.Services.GetRequiredService<RsaService>();
             // 1. Version
             BuildVersion = rdr.ReadUTF();
 
@@ -40,7 +42,7 @@ namespace wServer.networking.cliPackets
 
             // 3. GUID
             var guildBase64 = rdr.ReadUTF();
-            var decryptedGuild = RSA.Instance.Decrypt(guildBase64);
+            var decryptedGuild = rsaService.Decrypt(guildBase64);
 
             GUID = decryptedGuild;
 
@@ -49,7 +51,7 @@ namespace wServer.networking.cliPackets
 
             // 5. Password
             var passwordBase64 = rdr.ReadUTF();
-            var decryptedPassword = RSA.Instance.Decrypt(passwordBase64);
+            var decryptedPassword = rsaService.Decrypt(passwordBase64);
 
             Password = decryptedPassword;
 

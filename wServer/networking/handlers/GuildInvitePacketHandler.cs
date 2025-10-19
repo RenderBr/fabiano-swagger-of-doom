@@ -1,20 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.realm;
 using wServer.networking.svrPackets;
-using db;
-using wServer.realm.entities;
 using wServer.realm.entities.player;
 
 namespace wServer.networking.handlers
 {
-    class GuildInvitePacketHandler : PacketHandlerBase<GuildInvitePacket>
+    class GuildInvitePacketHandler(IServiceProvider serviceProvider) : PacketHandlerBase<GuildInvitePacket>(serviceProvider)
     {
-        public override PacketID ID { get { return PacketID.GUILDINVITE; } }
+        public override PacketID ID
+        {
+            get { return PacketID.GUILDINVITE; }
+        }
 
         protected override Task HandlePacket(Client client, GuildInvitePacket packet)
         {
@@ -24,14 +23,15 @@ namespace wServer.networking.handlers
 
         void Handle(Player player, GuildInvitePacket packet)
         {
-            if(player.Guild.IsDefault)
+            if (player.Guild.IsDefault)
             {
                 player.SendInfo("You are not in a guild");
                 return;
             }
+
             if (player.Guild[player.AccountId].Rank >= 20)
             {
-                foreach(var i in player.Owner.Players.Values)
+                foreach (var i in player.Owner.Players.Values)
                 {
                     Player target = player.Owner.GetPlayerByName(packet.Name);
 
@@ -43,6 +43,7 @@ namespace wServer.networking.handlers
                         });
                         return;
                     }
+
                     if (!target.NameChosen || player.Dist(target) > 20)
                     {
                         player.SendInfoWithTokens("server.invite_notfound", new KeyValuePair<string, object>[1]

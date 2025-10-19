@@ -1,8 +1,4 @@
-﻿using db;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System;
 using System.Threading.Tasks;
 using db.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
 using wServer.realm;
-using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.worlds;
 // Alias to resolve ambiguity between db.Models.Pet and wServer.realm.entities.Pet
@@ -18,7 +13,7 @@ using GamePet = wServer.realm.entities.Pet;
 
 namespace wServer.networking.handlers
 {
-    internal class PetYardCommandHandler : PacketHandlerBase<PetYardCommandPacket>
+    internal class PetYardCommandHandler(IServiceProvider serviceProvider) : PacketHandlerBase<PetYardCommandPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -162,7 +157,7 @@ namespace wServer.networking.handlers
             }
             catch (Exception ex)
             {
-                Program.Services.GetRequiredService<ILogger<PetYardCommandHandler>>().LogError(ex,
+                ServiceProvider.GetRequiredService<ILogger<PetYardCommandHandler>>().LogError(ex,
                     "Error in PetYardCommandHandler");
                 client.Player.SendError("Internal server error: " + ex.Message);
             }

@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
@@ -10,7 +11,7 @@ using wServer.realm.entities;
 
 namespace wServer.networking.handlers
 {
-    internal class BuyHandler : PacketHandlerBase<BuyPacket>
+    internal class BuyHandler(IServiceProvider serviceProvider) : PacketHandlerBase<BuyPacket>(serviceProvider)
     {
         public override PacketID ID
         {

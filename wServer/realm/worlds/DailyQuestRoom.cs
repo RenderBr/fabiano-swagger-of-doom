@@ -2,6 +2,8 @@
 
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using wServer;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 using db;
@@ -15,7 +17,7 @@ namespace wServer.realm.worlds
 {
     public class DailyQuestRoom : World
     {
-        public DailyQuestRoom(RealmManager manager) : base(manager)
+        public DailyQuestRoom(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Daily Quest Room";
             ClientWorldName = "{nexus.Daily_Quest_Room}";

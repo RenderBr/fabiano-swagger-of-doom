@@ -3,21 +3,16 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using db;
 using db.data;
-using db.Models;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using RageRealm.Shared.Configuration.WorldServer;
 using wServer.Events;
 using wServer.logic;
 using wServer.networking;
-using wServer.realm.commands;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
 using wServer.realm.worlds;
@@ -66,53 +61,15 @@ namespace wServer.realm
 
         private ILogger<RealmManager> _logger;
         private IEventBus _eventBus;
+        private ILogger<World> _worldLogger;
+        private RealmPortalMonitor _portalMonitor;
+        private GeneratorCache _generatorCache;
 
-        public RealmManager(ILogger<RealmManager> logger, IOptions<RealmConfiguration> options,
-            XmlDataService xmlDataService, DatabaseAdapter database, IEventBus eventBus, CommandManager commandManager, GeneratorCache generatorCache)
-        {
-            _logger = logger;
-            _logger.LogInformation("Initializing Realm Manager...");
-            _eventBus = eventBus;
-            Commands = commandManager;
-
-            MaxClients = options.Value.MaxClients;
-            TPS = options.Value.Tps;
-            Random = new Random();
-
-            Database = database;
-            GameDataService = xmlDataService;
-            Behaviors = new BehaviorDb(this);
-            generatorCache.Init();
-            MerchantLists.InitMerchatLists(GameDataService);
-
-            AddWorld(World.NEXUS_ID, Worlds[0] = new Nexus(this));
-            AddWorld(World.MARKET, new ClothBazaar(this));
-            AddWorld(World.TEST_ID, new Test(this));
-            AddWorld(World.TUT_ID, new Tutorial(true, this));
-            AddWorld(World.DAILY_QUEST_ID, new DailyQuestRoom(this));
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    var world = await GameWorld.AutoNameAsync(1, true).ConfigureAwait(false);
-                    await AddWorldAsync(world);
-                }
-                catch (Exception ex)
-                {
-                    Program.Logger.LogError(ex, "Failed to initialize the Nexus.");
-                }
-            });
-
-
-            Chat = new ChatManager(this);
-
-            _logger.LogInformation("Realm Manager initialized.");
-        }
-
+        internal ILogger<World> WorldLogger => _worldLogger;
+        internal RealmPortalMonitor PortalMonitor => _portalMonitor;
+        internal GeneratorCache GeneratorCache => _generatorCache;
         public BehaviorDb Behaviors { get; private set; } = null!;
         public ChatManager Chat { get; private set; } = null!;
-        public CommandManager Commands { get; private set; } = null!;
         public XmlDataService GameDataService { get; private set; }
         public LogicTicker Logic { get; private set; } = null!;
         public NetworkTicker Network { get; private set; } = null!;
@@ -121,6 +78,61 @@ namespace wServer.realm
         public int MaxClients { get; }
         public int TPS { get; }
         public bool Terminating { get; private set; }
+
+        public RealmManager(ILogger<RealmManager> logger, IOptions<RealmConfiguration> options,
+            XmlDataService xmlDataService, DatabaseAdapter database, IEventBus eventBus,
+            GeneratorCache generatorCache, ILogger<World> worldLogger, RealmPortalMonitor portalMonitor)
+        {
+            _logger = logger;
+            _logger.LogInformation("Constructing Realm Manager...");
+            _eventBus = eventBus;
+            _worldLogger = worldLogger;
+            _portalMonitor = portalMonitor;
+            _generatorCache = generatorCache;
+
+            MaxClients = options.Value.MaxClients;
+            TPS = options.Value.Tps;
+            Random = new Random();
+
+            Database = database;
+            GameDataService = xmlDataService;
+            _logger.LogInformation("Realm Manager constructed.");
+        }
+
+        public void Initialize()
+        {
+            _logger.LogInformation("Initializing Realm Manager...");
+            Behaviors = new BehaviorDb(this);
+            GeneratorCache.Init();
+            MerchantLists.InitMerchatLists(GameDataService);
+
+            var nexus = new Nexus(this, _worldLogger, _portalMonitor, GeneratorCache);
+            AddWorld(World.NEXUS_ID, Worlds[0] = nexus);
+            _portalMonitor.SetNexus(nexus);
+            
+            AddWorld(World.MARKET, new ClothBazaar(this, _worldLogger, _portalMonitor, GeneratorCache));
+            AddWorld(World.TEST_ID, new Test(this, _worldLogger, _portalMonitor, GeneratorCache));
+            AddWorld(World.TUT_ID, new Tutorial(true, this, _worldLogger, _portalMonitor, GeneratorCache));
+            AddWorld(World.DAILY_QUEST_ID, new DailyQuestRoom(this, _worldLogger, _portalMonitor, GeneratorCache));
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await nexus.InitAsync().ConfigureAwait(false);
+                    
+                    var world = await GameWorld.AutoNameAsync(1, true).ConfigureAwait(false);
+                    await AddWorldAsync(world);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to initialize nexus portal.");
+                }
+            });
+
+            Chat = new ChatManager(this);
+            _logger.LogInformation("Realm Manager initialized.");
+        }
 
         // -----------------------------------------
         // run
@@ -137,7 +149,7 @@ namespace wServer.realm
             _logicTask = Task.Run(() => Logic.TickLoop(_cts.Token));
 
             _logger.LogInformation("Realm Manager started.");
-            await Task.Yield();
+            await Task.CompletedTask;
         }
 
         public async Task CloseWorldAsync(World world)
@@ -156,7 +168,7 @@ namespace wServer.realm
 
             try
             {
-                _cts.Cancel();
+                await _cts.CancelAsync();
 
                 // disconnect and save clients
                 var clients = Clients.Values.ToList();
@@ -214,24 +226,24 @@ namespace wServer.realm
         {
             if (Clients.Count >= MaxClients)
             {
-                Program.Logger.LogInformation("Kicking {AccountName} because server is full.", psr.Account.Name);
+                _logger.LogInformation("Kicking {AccountName} because server is full.", psr.Account.Name);
                 return false;
             }
 
             if (psr.Account.Banned)
             {
-                Program.Logger.LogInformation("Kicking {AccountName} because account is banned.", psr.Account.Name);
+                _logger.LogInformation("Kicking {AccountName} because account is banned.", psr.Account.Name);
                 return false;
             }
 
             psr.Id = Interlocked.Increment(ref _nextClientId);
             if (Clients.ContainsKey(psr.Account.AccountId) && !Clients[psr.Account.AccountId].Socket.Connected)
             {
-                Program.Logger.LogInformation("Removing disconnected client {AccountName}.", psr.Account.Name);
+                _logger.LogInformation("Removing disconnected client {AccountName}.", psr.Account.Name);
                 Clients.TryRemove(psr.Account.AccountId, out _);
             }
 
-            Program.Logger.LogInformation("Client {AccountName} connected.", psr.Account.Name);
+            _logger.LogInformation("Client {AccountName} connected.", psr.Account.Name);
             return Clients.TryAdd(psr.Account.AccountId, psr);
         }
 
@@ -259,7 +271,7 @@ namespace wServer.realm
             world.Id = Interlocked.Increment(ref _nextWorldId);
             Worlds[world.Id] = world;
             OnWorldAdded(world);
-            return world;
+            return await Task.FromResult(world);
         }
 
         public bool RemoveWorld(World world)
@@ -292,6 +304,11 @@ namespace wServer.realm
             if (world is GameWorld)
             {
                 _eventBus.Publish(new WorldEvents.WorldCreatedEvent(world));
+            }
+
+            if (world is Nexus nexus)
+            {
+                _eventBus.Publish(new WorldEvents.WorldInitializedEvent(nexus));
             }
 
             _logger.LogInformation("World {WorldId} ({WorldName}) added.", world.Id, world.Name);

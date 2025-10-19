@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 
@@ -7,7 +8,7 @@ using wServer.networking.cliPackets;
 
 namespace wServer.networking.handlers
 {
-    internal class SquareHitHandler : PacketHandlerBase<SquareHitPacket>
+    internal class SquareHitHandler(IServiceProvider serviceProvider) : PacketHandlerBase<SquareHitPacket>(serviceProvider)
     {
         public override PacketID ID
         {

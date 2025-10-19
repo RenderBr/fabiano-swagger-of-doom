@@ -19,7 +19,7 @@ using FailurePacket = wServer.networking.svrPackets.FailurePacket;
 
 namespace wServer.networking.handlers
 {
-    internal class HelloHandler : PacketHandlerBase<HelloPacket>
+    internal class HelloHandler(IServiceProvider serviceProvider) : PacketHandlerBase<HelloPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -28,10 +28,10 @@ namespace wServer.networking.handlers
 
         protected override async Task HandlePacket(Client client, HelloPacket packet)
         {
-            var log = Program.Services.GetRequiredService<ILogger<HelloHandler>>();
+            var logger = ServiceProvider.GetRequiredService<ILogger<HelloHandler>>();
             if (Server.VERSION != packet.BuildVersion)
             {
-                log.LogWarning(
+                logger.LogWarning(
                     "HELLO mismatch check: client version '{PacketBuildVersion}', server version '{ServerVersion}'",
                     packet.BuildVersion, Server.VERSION);
                 client.SendPacket(new FailurePacket
@@ -62,18 +62,18 @@ namespace wServer.networking.handlers
 
             if (account == null)
             {
-                log.LogInformation(@"Account not verified.");
+                logger.LogInformation(@"Account not verified.");
                 // TODO: Create guest account using AccountService
                 client.Account = new Account { Guest = true, Uuid = packet.GUID, Name = "Guest" };
 
                 if (client.Account == null)
                 {
-                    log.LogInformation(@"Account is null!");
+                    logger.LogInformation(@"Account is null!");
                     client.SendPacket(new FailurePacket
                     {
                         ErrorDescription = "Invalid account."
                     });
-                    Program.Logger.LogInformation("Kicking {AccountName} because account is null.",
+                    logger.LogInformation("Kicking {AccountName} because account is null.",
                         client.Account.Name);
                     client.Disconnect();
                     return;
@@ -97,7 +97,7 @@ namespace wServer.networking.handlers
                             ErrorId = 0,
                             ErrorDescription = "You are not whitelisted!"
                         });
-                        Program.Logger.LogInformation("Kicking {AccountName} because they are not whitelisted.",
+                        logger.LogInformation("Kicking {AccountName} because they are not whitelisted.",
                             client.Account.Name);
                         client.Disconnect();
                         return;
@@ -127,7 +127,7 @@ namespace wServer.networking.handlers
                 //}
             }
 
-            log.LogInformation(@"Client trying to connect!");
+            logger.LogInformation(@"Client trying to connect!");
             client.ConnectedBuild = packet.BuildVersion;
             if (!client.Manager.TryConnect(client))
             {
@@ -137,15 +137,15 @@ namespace wServer.networking.handlers
                     ErrorDescription = "Failed to connect."
                 });
                 client.Disconnect();
-                log.LogWarning(@"Failed to connect.");
+                logger.LogWarning(@"Failed to connect.");
             }
             else
             {
-                log.LogInformation(@"Client loading world");
+                logger.LogInformation(@"Client loading world");
                 if (packet.GameId == World.NEXUS_LIMBO) packet.GameId = World.NEXUS_ID;
                 World world = client.Manager.GetWorld(packet.GameId);
                 if (world == null && packet.GameId == World.TUT_ID)
-                    world = client.Manager.AddWorld(new Tutorial(false, client.Manager));
+                    world = client.Manager.AddWorld(new Tutorial(false, client.Manager, client.Manager.WorldLogger, client.Manager.PortalMonitor, client.Manager.GeneratorCache));
                 if (world == null)
                 {
                     client.SendPacket(new FailurePacket
@@ -183,7 +183,7 @@ namespace wServer.networking.handlers
                 }
 
                 client.Reconnecting = false;
-                log.LogInformation(@"Client joined world {WorldID}", world.Id);
+                logger.LogInformation(@"Client joined world {WorldID}", world.Id);
                 if (packet.MapInfo.Length > 0) //Test World
                     (world as Test).LoadJson(Encoding.Default.GetString(packet.MapInfo));
 
@@ -207,7 +207,7 @@ namespace wServer.networking.handlers
                     ConnectionGuid = Guid.NewGuid().ToString(),
                     GameOpenedTime = (uint)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds,
                     ClientXML = world.ClientXml,
-                    ExtraXML = Manager.GameDataService.AdditionXml
+                    ExtraXML = client.Manager.GameDataService.AdditionXml
                 });
                 client.Stage = ProtocalStage.Handshaked;
             }

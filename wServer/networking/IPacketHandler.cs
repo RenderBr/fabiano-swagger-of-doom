@@ -14,21 +14,18 @@ using wServer.realm;
 
 namespace wServer.networking
 {
-    internal interface IPacketHandler
+    public interface IPacketHandler
     {
         PacketID ID { get; }
         Task Handle(Client client, ClientPacket packet);
     }
 
-    internal abstract class PacketHandlerBase<T> : IPacketHandler where T : ClientPacket
+    public abstract class PacketHandlerBase<T>(IServiceProvider serviceProvider) : IPacketHandler
+        where T : ClientPacket
     {
-        protected ILogger _logger;
-        private Client client;
+        protected IServiceProvider ServiceProvider => serviceProvider;
 
-        public PacketHandlerBase()
-        {
-            _logger = Program.Services?.GetService<ILoggerFactory>()?.CreateLogger(GetType());
-        }
+        private Client client;
 
         public abstract PacketID ID { get; }
 
@@ -56,18 +53,18 @@ namespace wServer.networking
         }
     }
 
-    internal class PacketHandlers
+    public class PacketHandlers
     {
-        public static Dictionary<PacketID, IPacketHandler> Handlers = new Dictionary<PacketID, IPacketHandler>();
+        public Dictionary<PacketID, IPacketHandler> Handlers = new Dictionary<PacketID, IPacketHandler>();
 
-        static PacketHandlers()
+        public PacketHandlers(IServiceProvider serviceProvider)
         {
             foreach (Type i in typeof(Packet).Assembly.GetTypes())
             {
                 if (typeof(IPacketHandler).IsAssignableFrom(i) &&
                     !i.IsAbstract && !i.IsInterface)
                 {
-                    IPacketHandler pkt = (IPacketHandler)Activator.CreateInstance(i);
+                    IPacketHandler pkt = (IPacketHandler)Activator.CreateInstance(i, serviceProvider);
                     Handlers.Add(pkt.ID, pkt);
                 }
             }

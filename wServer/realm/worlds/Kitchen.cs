@@ -1,8 +1,11 @@
-﻿namespace wServer.realm.worlds
+﻿using Microsoft.Extensions.Logging;
+using wServer;
+
+namespace wServer.realm.worlds
 {
     public class Kitchen : World
     {
-        public Kitchen(RealmManager manager) : base(manager)
+        public Kitchen(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Kitchen";
             ClientWorldName = "server.Kitchen";

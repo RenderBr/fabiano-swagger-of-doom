@@ -1,5 +1,7 @@
 ﻿#region
 
+using Microsoft.Extensions.Logging;
+using wServer;
 using wServer.networking;
 
 #endregion
@@ -8,7 +10,7 @@ namespace wServer.realm.worlds
 {
     public class OryxCastle : World
     {
-        public OryxCastle(RealmManager manager) : base(manager)
+        public OryxCastle(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Oryx's Castle";
             ClientWorldName = "server.Oryx's_Castle";
@@ -25,7 +27,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new OryxCastle(Manager));
+            return Manager.AddWorld(new OryxCastle(Manager, _logger, _portalMonitor, _generatorCache));
         }
     }
 }

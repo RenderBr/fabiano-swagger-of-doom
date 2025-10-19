@@ -1,21 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
-using wServer.realm;
 using wServer.networking.svrPackets;
-using db;
 using db.Models;
-using wServer.realm.entities;
-using wServer.realm.entities.player;
 
 namespace wServer.networking.handlers
 {
-    class GuildRemovePacketHandler : PacketHandlerBase<GuildRemovePacket>
+    class GuildRemovePacketHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<GuildRemovePacket>(serviceProvider)
     {
-        public override PacketID ID { get { return PacketID.GUILDREMOVE; } }
+        public override PacketID ID
+        {
+            get { return PacketID.GUILDREMOVE; }
+        }
 
         protected override Task HandlePacket(Client client, GuildRemovePacket packet)
         {
@@ -32,10 +29,12 @@ namespace wServer.networking.handlers
                     var p = client.Manager.FindPlayer(packet.Name);
                     if (p != null && p.Guild == client.Player.Guild && p.NameChosen)
                     {
-                        if(client.Player.Guild[client.Account.AccountId].Rank <= p.Guild[p.AccountId].Rank && p.Guild.Name != client.Player.Guild.Name)
+                        if (client.Player.Guild[client.Account.AccountId].Rank <= p.Guild[p.AccountId].Rank &&
+                            p.Guild.Name != client.Player.Guild.Name)
                             return;
 
-                        var g = db.ChangeGuild(p.Client.Account, p.Client.Account.Guild.Id, p.Guild[p.AccountId].Rank, p.Client.Account.Guild.Fame, true);
+                        var g = db.ChangeGuild(p.Client.Account, p.Client.Account.Guild.Id, p.Guild[p.AccountId].Rank,
+                            p.Client.Account.Guild.Fame, true);
                         client.Player.Guild.RemoveFromGuild(client.Player, p);
                     }
                     else
@@ -47,11 +46,14 @@ namespace wServer.networking.handlers
                             {
                                 if (acc.Guild != null && acc.Guild.Name == client.Player.Guild.Name)
                                 {
-                                    if (client.Player.Guild[client.Account.AccountId].Rank <= acc.Guild.Rank && acc.Guild.Name != client.Player.Guild.Name)
+                                    if (client.Player.Guild[client.Account.AccountId].Rank <= acc.Guild.Rank &&
+                                        acc.Guild.Name != client.Player.Guild.Name)
                                         return;
 
                                     db.ChangeGuild(acc, acc.Guild.Id, acc.Guild.Rank, acc.Guild.Fame, true);
-                                    client.Player.Guild.Chat(client.Player, client.Player.Name + " removed " + acc.Name + " from " + client.Player.Guild.Name);
+                                    client.Player.Guild.Chat(client.Player,
+                                        client.Player.Name + " removed " + acc.Name + " from " +
+                                        client.Player.Guild.Name);
                                 }
                             }
                             catch (Exception e)
@@ -77,6 +79,7 @@ namespace wServer.networking.handlers
                         Text = e.Message
                     });
                 }
+
                 client.SendPacket(new CreateGuildResultPacket()
                 {
                     Success = true,

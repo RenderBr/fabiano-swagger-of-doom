@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using wServer.networking.cliPackets;
 using wServer.networking.svrPackets;
@@ -9,7 +6,7 @@ using wServer.realm;
 
 namespace wServer.networking.handlers
 {
-    internal class LeaveArenaHandler : PacketHandlerBase<LeaveArenaPacket>
+    internal class LeaveArenaHandler(IServiceProvider serviceProvider) : PacketHandlerBase<LeaveArenaPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -31,6 +28,7 @@ namespace wServer.networking.handlers
                 });
                 return Task.CompletedTask;
             }
+
             client.Reconnect(new ReconnectPacket
             {
                 Host = "",

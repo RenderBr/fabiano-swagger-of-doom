@@ -1,5 +1,6 @@
 using db.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace db;
 
@@ -24,14 +25,18 @@ public class ServerDbContext : DbContext
     public DbSet<MysteryBox> MysteryBoxes => Set<MysteryBox>();
     public DbSet<ClientError> ClientErrors => Set<ClientError>();
     public DbSet<UnlockedClass> UnlockedClasses => Set<UnlockedClass>();
-
-    public ServerDbContext(DbContextOptions<ServerDbContext> options)
+    private readonly ILogger<ServerDbContext> _logger;
+    
+    public ServerDbContext(DbContextOptions<ServerDbContext> options, ILogger<ServerDbContext> logger)
         : base(options)
     {
+        _logger = logger;
+        _logger.LogInformation("ServerDbContext initialized.");
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        _logger.LogInformation("Configuring model relationships and keys.");
         base.OnModelCreating(modelBuilder);
 
         // Configure composite keys
@@ -108,6 +113,7 @@ public class ServerDbContext : DbContext
             .HasForeignKey(a => a.GuildId)
             .HasPrincipalKey(g => g.Id)
             .OnDelete(DeleteBehavior.Restrict);
-
+        
+        _logger.LogInformation("Model configuration complete.");
     }
 }

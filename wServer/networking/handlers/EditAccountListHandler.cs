@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,7 +15,8 @@ using wServer.realm.entities.player;
 
 namespace wServer.networking.handlers
 {
-    internal class EditAccountListHandler : PacketHandlerBase<EditAccountListPacket>
+    internal class EditAccountListHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<EditAccountListPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -27,22 +29,26 @@ namespace wServer.networking.handlers
             if (client.Player.Owner == null) return Task.CompletedTask;
             client.Manager.Logic.AddPendingAction(t =>
             {
-                 client.Manager.Database.DoActionAsync(async db =>
+                client.Manager.Database.DoActionAsync(async db =>
                 {
-                    target = client.Player.Owner.GetEntity(packet.ObjectId) is Player ? client.Player.Owner.GetEntity(packet.ObjectId) as Player : null;
+                    target = client.Player.Owner.GetEntity(packet.ObjectId) is Player
+                        ? client.Player.Owner.GetEntity(packet.ObjectId) as Player
+                        : null;
                     if (target == null) return;
-                    if(client.Account.AccountId == target.AccountId)
+                    if (client.Account.AccountId == target.AccountId)
                     {
                         SendFailure("You cannot do that with yourself.");
                         return;
                     }
+
                     switch (packet.AccountListId)
                     {
                         case AccountListPacket.LOCKED_LIST_ID:
                             if (packet.Add)
                             {
                                 // TODO: implement via repository; append to CSV for now
-                                client.Account.Locked = string.Join(",", (client.Player.Locked ?? new List<string>()).Concat(new[] { target.AccountId }));
+                                client.Account.Locked = string.Join(",",
+                                    (client.Player.Locked ?? new List<string>()).Concat(new[] { target.AccountId }));
                                 client.Player.Locked.Add(target.AccountId);
                             }
                             else
@@ -52,11 +58,13 @@ namespace wServer.networking.handlers
                                 client.Account.Locked = string.Join(",", list);
                                 client.Player.Locked.Remove(target.AccountId);
                             }
+
                             break;
                         case AccountListPacket.IGNORED_LIST_ID:
                             if (packet.Add)
                             {
-                                client.Account.Ignored = string.Join(",", (client.Player.Ignored ?? new List<string>()).Concat(new[] { target.AccountId }));
+                                client.Account.Ignored = string.Join(",",
+                                    (client.Player.Ignored ?? new List<string>()).Concat(new[] { target.AccountId }));
                                 client.Player.Ignored.Add(target.AccountId);
                             }
                             else
@@ -66,9 +74,10 @@ namespace wServer.networking.handlers
                                 client.Account.Ignored = string.Join(",", ilist);
                                 client.Player.Ignored.Remove(target.AccountId);
                             }
+
                             break;
                     }
-                            
+
                     //List<string> list;
                     //if (packet.AccountListId == LOCKED_LIST_ID)
                     //    list = client.Player.Locked;
@@ -103,7 +112,7 @@ namespace wServer.networking.handlers
                     //}
 
                     //client.Player.SendAccountList(list, packet.AccountListId);
-                         });
+                });
             }, PendingPriority.Networking);
             return Task.CompletedTask;
         }

@@ -1,20 +1,22 @@
 using Microsoft.Extensions.Logging;
+using wServer;
+using wServer.Events;
+using wServer.realm;
 using wServer.realm.worlds;
 
 namespace wServer.Factories;
 
-public class GameWorldFactory : IGameWorldFactory
+public class GameWorldFactory(
+    ILoggerFactory loggerFactory,
+    RealmManager realmManager,
+    RealmPortalMonitor portalMonitor,
+    GeneratorCache generatorCache,
+    IEventBus eventBus)
+    : IGameWorldFactory
 {
-    private readonly ILoggerFactory _loggerFactory;
-    
-    public GameWorldFactory(ILoggerFactory loggerFactory)
-    {
-        _loggerFactory = loggerFactory;
-    }
-    
     public GameWorld Create(int mapId, string name, bool oryxPresent)
     {
-        var logger = _loggerFactory.CreateLogger<GameWorld>();
-        return new GameWorld(mapId, name, oryxPresent, logger);
+        var logger = loggerFactory.CreateLogger<World>();
+        return new GameWorld(mapId, name, oryxPresent, realmManager, logger, portalMonitor, generatorCache, eventBus);
     }
 }

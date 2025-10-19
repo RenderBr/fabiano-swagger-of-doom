@@ -1,8 +1,11 @@
-﻿namespace wServer.realm.worlds
+﻿using Microsoft.Extensions.Logging;
+using wServer;
+
+namespace wServer.realm.worlds
 {
     public class TomboftheAncients : World
     {
-        public TomboftheAncients(RealmManager manager) : base(manager)
+        public TomboftheAncients(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Tomb of the Ancients";
             ClientWorldName = "dungeons.Tomb_of_the_Ancients";

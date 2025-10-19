@@ -1,6 +1,8 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using wServer.networking.cliPackets;
 
@@ -8,7 +10,7 @@ using wServer.networking.cliPackets;
 
 namespace wServer.networking.handlers
 {
-    internal class RequestTradeHandler : PacketHandlerBase<RequestTradePacket>
+    internal class RequestTradeHandler(IServiceProvider serviceProvider) : PacketHandlerBase<RequestTradePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -22,7 +24,7 @@ namespace wServer.networking.handlers
         }
     }
 
-    internal class ChangeTradeHandler : PacketHandlerBase<ChangeTradePacket>
+    internal class ChangeTradeHandler(IServiceProvider serviceProvider) : PacketHandlerBase<ChangeTradePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -33,7 +35,7 @@ namespace wServer.networking.handlers
         {
             if (client?.Player == null)
             {
-                Program.Logger.LogWarning("Received ChangeTradePacket from null player");
+                ServiceProvider.GetRequiredService<ILogger<ChangeTradeHandler>>().LogWarning("Received ChangeTradePacket from null player");
                 return Task.CompletedTask; // Player not loaded or disconnected
             }
 
@@ -42,7 +44,7 @@ namespace wServer.networking.handlers
         }
     }
 
-    internal class AcceptTradeHandler : PacketHandlerBase<AcceptTradePacket>
+    internal class AcceptTradeHandler(IServiceProvider serviceProvider) : PacketHandlerBase<AcceptTradePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -56,7 +58,7 @@ namespace wServer.networking.handlers
         }
     }
 
-    internal class CancelTradeHandler : PacketHandlerBase<CancelTradePacket>
+    internal class CancelTradeHandler(IServiceProvider serviceProvider) : PacketHandlerBase<CancelTradePacket>(serviceProvider)
     {
         public override PacketID ID
         {

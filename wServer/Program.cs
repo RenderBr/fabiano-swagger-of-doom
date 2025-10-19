@@ -4,196 +4,107 @@ using System.IO;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using db;
 using db.data;
-using db.Repositories;
-using db.Services;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using RageRealm.Shared.Configuration;
 using RageRealm.Shared.Configuration.WorldServer;
+using Serilog;
+using wServer;
 using wServer.Events;
-using wServer.Factories;
 using wServer.networking;
-using wServer.realm;
 using wServer.Services;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 internal class Program
 {
     public static bool WhiteList { get; private set; }
     public static bool Verify { get; private set; }
-
-    public static ILogger Logger { get; private set; }
-    private static RealmManager manager;
-
     public static WorldServerConfiguration Config { get; private set; } = new();
     public static DateTime WhiteListTurnOff { get; private set; }
-    public static ServiceProvider Services { get; set; }
-
+    public static IServiceProvider Services { get; set; }
+    
     private static async Task Main(string[] args)
     {
         Console.Title = "RealmRage - World Server v" + Server.VERSION;
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+        Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+        Thread.CurrentThread.Name = "Entry";
 
-        try
+        // auto-create config if missing
+        if (!File.Exists("appsettings.json"))
         {
-            if (!File.Exists("appsettings.json"))
+            var defaultConfig = new WorldServerConfiguration();
+            var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync("appsettings.json", json);
+            Console.WriteLine(
+                "Default configuration file created. Please review 'appsettings.json' and restart the server.");
+            Console.ReadKey();
+            return;
+        }
+
+        var host = Host.CreateDefaultBuilder(args)
+            .ConfigureAppConfiguration(cfg =>
             {
-                var defaultConfig = new WorldServerConfiguration();
-                var json = System.Text.Json.JsonSerializer.Serialize(defaultConfig,
-                    new System.Text.Json.JsonSerializerOptions
-                        { WriteIndented = true });
-                await File.WriteAllTextAsync("appsettings.json", json);
-                Console.WriteLine(
-                    "Default configuration file created. Please review 'appsettings.json' and restart the server.");
-                Console.ReadKey();
-                return;
-            }
-
-            var configBuilder = new ConfigurationBuilder()
-                .SetBasePath(AppContext.BaseDirectory)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-
-            var configuration = configBuilder.Build();
-
-            Config = configuration.Get<WorldServerConfiguration>();
-
-            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-            Thread.CurrentThread.Name = "Entry";
-
-            // setup DI
-            var serviceBuilder = new ServiceCollection();
-            serviceBuilder.AddSingleton(Config);
-
-            // Initialize Logging Service
-            serviceBuilder.AddLogging(builder =>
+                cfg.SetBasePath(AppContext.BaseDirectory)
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            })
+            .ConfigureLogging((ctx, logging) => { logging.ClearProviders(); })
+            .UseSerilog((ctx, services, configuration) =>
             {
-                builder.ClearProviders();
+                var config = ctx.Configuration.Get<WorldServerConfiguration>();
 
-                if (!Enum.TryParse(Config.Logging.LogLevel, true, out LogLevel logLevel))
+                configuration.Enrich.FromLogContext();
+
+                if (config.Logging.EnableConsole)
                 {
-                    logLevel = LogLevel.Information;
+                    configuration.WriteTo.Async(a => a.Console(
+                        outputTemplate:
+                        "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext,-45} {Scope} {Message:lj}{NewLine}{Exception}"));
                 }
 
-                builder.SetMinimumLevel(logLevel);
-
-                if (Config.Logging.EnableConsole)
+                if (config.Logging.EnableFile)
                 {
-                    builder.AddSimpleConsole(options =>
-                    {
-                        options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] ";
-                        options.IncludeScopes = true;
-                        options.UseUtcTimestamp = true;
-                    });
+                    configuration.WriteTo.Async(a => a.File(
+                        config.Logging.FilePath,
+                        retainedFileCountLimit: 7,
+                        shared: true,
+                        outputTemplate:
+                        "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext} {Scope} {Message:lj}{NewLine}{Exception}",
+                        rollingInterval:
+                        Serilog.RollingInterval.Day));
                 }
 
-                if (Config.Logging.EnableDebug)
+                if (config.Logging.EnableDebug)
                 {
-                    builder.AddDebug();
+                    configuration.MinimumLevel.Debug();
                 }
                 else
                 {
-                    builder.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
+                    configuration.MinimumLevel.Information();
                 }
-
-                if (Config.Logging.EnableFile && !string.IsNullOrEmpty(Config.Logging.FilePath))
-                {
-                    builder.AddFile(Config.Logging.FilePath);
-                }
-            });
-
-            // register your services/repositories
-            serviceBuilder.AddSingleton<XmlDataService>();
-            serviceBuilder.AddSingleton<IEventBus, EventBus>();
-            serviceBuilder.AddDataServices(configuration)
-                    .AddRepositoryServices();
-
-            serviceBuilder.Configure<RealmConfiguration>(configuration.GetSection("Realm"));
-            serviceBuilder.AddSingleton<RealmManager>();
-            serviceBuilder.AddSingleton<IPortalFactory, PortalFactory>();
-            serviceBuilder.AddSingleton<IGameWorldFactory, GameWorldFactory>();
-            serviceBuilder.AddSingleton<IWorldFactory, WorldFactory>();
-            serviceBuilder.AddSingleton<CharacterCreationService>();
-            serviceBuilder.AddTransient<RealmPortalMonitor>();
-            serviceBuilder.AddHandlingServices();
-
-            Services = serviceBuilder.BuildServiceProvider();
-            Logger = Services.GetRequiredService<ILogger<Program>>();
-
-            // create the realm manager
-            manager = Services.GetRequiredService<RealmManager>();
-            await manager.RunAsync();
-
-            WhiteList = Config.Realm.Whitelist;
-            Verify = Config.Realm.VerifyEmail;
-            WhiteListTurnOff = Config.Realm.WhitelistTurnOff;
-
-            // create the servers
-            var server = new Server(manager);
-            var policy = new PolicyServer();
-
-            Console.CancelKeyPress += (_, e) =>
+            })
+            .ConfigureServices((ctx, services) =>
             {
-                e.Cancel = true;
-                Logger.LogInformation("Ctrl+C detected. Shutting down...");
-                _ = ShutdownAsync(server, policy); // fire & forget async shutdown
-            };
+                var config = ctx.Configuration.Get<WorldServerConfiguration>();
+                services.AddSingleton(config);
 
-            await policy.StartAsync();
-            await server.StartAsync();
+                services
+                    .AddSingleton<RsaService>()
+                    .AddSingleton<XmlDataService>()
+                    .AddDataServices(ctx.Configuration)
+                    .AddRepositoryServices()
+                    .AddSingleton<IEventBus, EventBus>()
+                    .AddHandlingServices()
+                    .AddSingleton<Server>()
+                    .AddHostedService<WorldServerHostedService>();
+            })
+            .Build();
 
-            if (Config.Realm.BroadcastNews && File.Exists("news.txt"))
-                _ = Task.Run(AutoBroadcastNews);
-
-            Logger.LogInformation("Server initialized. Press ESC to exit...");
-
-            while (Console.ReadKey(true).Key != ConsoleKey.Escape)
-                await Task.Delay(50);
-
-            await ShutdownAsync(server, policy);
-        }
-        catch (Exception e)
-        {
-            Logger.LogCritical(e, "Fatal error during initialization");
-            if (manager != null)
-            {
-                foreach (var c in manager.Clients.Values)
-                    c.Disconnect();
-            }
-
-            Console.ReadLine();
-        }
-    }
-
-    private static async Task ShutdownAsync(Server server, PolicyServer policy)
-    {
-        try
-        {
-            Logger.LogInformation("Terminating...");
-            await server.StopAsync();
-            await policy.StopAsync();
-            await manager.StopAsync();
-            Logger.LogInformation("Server terminated.");
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error during shutdown");
-        }
-    }
-
-    private static async Task AutoBroadcastNews()
-    {
-        var news = await File.ReadAllLinesAsync("news.txt");
-        var rand = new Random();
-        var cm = new ChatManager(manager);
-
-        while (true)
-        {
-            cm.News(news[rand.Next(news.Length)]);
-            await Task.Delay(TimeSpan.FromMinutes(5));
-        }
+        Services = host.Services;
+        await host.RunAsync();
     }
 }

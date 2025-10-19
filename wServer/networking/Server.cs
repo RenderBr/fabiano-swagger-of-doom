@@ -6,32 +6,24 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
+using wServer.Factories;
 using wServer.realm;
 
 #endregion
 
 namespace wServer.networking
 {
-    internal class Server : IDisposable
+    public class Server(ILogger<Server> logger, RealmManager manager, IClientFactory clientFactory) : IDisposable
     {
         public const string VERSION = "1.0.3.0";
-        private readonly ILogger<Server> _logger;
         private bool _running;
 
-        public Server(RealmManager manager)
-        {
-            _logger = Program.Services?.GetRequiredService<ILogger<Server>>();
-            Socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            Manager = manager;
-        }
-
-        public Socket Socket { get; }
-        public RealmManager Manager { get; }
+        public Socket Socket { get; } = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        public RealmManager Manager { get; } = manager;
 
         public async Task StartAsync()
         {
-            _logger?.LogInformation("Starting server...");
+            logger?.LogInformation("Starting server...");
             Socket.Bind(new IPEndPoint(IPAddress.Any, Program.Config.Realm.ServerPort));
             Socket.Listen(255);
             _running = true;
@@ -48,7 +40,7 @@ namespace wServer.networking
                 try
                 {
                     var skt = await Socket.AcceptAsync().ConfigureAwait(false);
-                    _ = Task.Run(() => new Client(Manager, skt));
+                    _ = Task.Run(() => clientFactory.CreateClient(Program.Services, skt));
                 }
                 catch (ObjectDisposedException)
                 {
@@ -57,7 +49,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Error accepting connection");
+                    logger?.LogError(ex, "Error accepting connection");
                     await Task.Delay(100).ConfigureAwait(false);
                 }
             }
@@ -65,7 +57,7 @@ namespace wServer.networking
 
         public async Task StopAsync()
         {
-            _logger?.LogInformation("Stopping server...");
+            logger?.LogInformation("Stopping server...");
             _running = false;
 
             try
@@ -74,7 +66,7 @@ namespace wServer.networking
             }
             catch (Exception ex)
             {
-                _logger?.LogWarning(ex, "Error closing socket");
+                logger?.LogWarning(ex, "Error closing socket");
             }
 
             // save & disconnect all clients
@@ -87,7 +79,7 @@ namespace wServer.networking
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(ex, "Failed to save client {ClientName}", client?.Account?.Name);
+                    logger?.LogWarning(ex, "Failed to save client {ClientName}", client?.Account?.Name);
                 }
 
                 client?.Disconnect();
@@ -99,6 +91,5 @@ namespace wServer.networking
             _running = false;
             Socket?.Dispose();
         }
-
     }
 }

@@ -8,7 +8,7 @@ public static class RepositoryServiceCollectionExtensions
 {
     public static IServiceCollection AddRepositoryServices(this IServiceCollection services)
     {
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<AccountService>();
         services.AddScoped<IAccountRepository, AccountRepository>();
         services.AddScoped<ICharacterRepository, CharacterRepository>();
         services.AddScoped<IDailyQuestRepository, DailyQuestRepository>();
@@ -18,7 +18,6 @@ public static class RepositoryServiceCollectionExtensions
         services.AddScoped<IPetRepository, PetRepository>();
         services.AddScoped<IVaultRepository, VaultRepository>();
         services.AddScoped<IStatRepository, StatRepository>();
-        services.AddScoped<AccountService>();
 
         return services;
     }

@@ -1,8 +1,11 @@
-﻿namespace wServer.realm.worlds
+﻿using Microsoft.Extensions.Logging;
+using wServer;
+
+namespace wServer.realm.worlds
 {
     public class CandylandHuntingGrounds : World
     {
-        public CandylandHuntingGrounds(RealmManager manager) : base(manager)
+        public CandylandHuntingGrounds(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "Candyland Hunting Grounds";
             ClientWorldName = "dungeons.Candyland_Hunting_Grounds";

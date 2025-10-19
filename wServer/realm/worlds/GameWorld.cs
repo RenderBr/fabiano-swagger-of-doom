@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using RageRealm.Shared.Models;
+using wServer.Events;
 using wServer.Factories;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -16,15 +17,18 @@ namespace wServer.realm.worlds
 {
     public class GameWorld : World
     {
-        public ILogger<GameWorld> Logger;
+        public ILogger<World> Logger;
 
         private readonly int _mapId;
         private readonly bool _oryxPresent;
         private string _displayName;
+        IEventBus EventBus;
 
         public Oryx? Overseer { get; private set; }
 
-        public GameWorld(int mapId, string name, bool oryxPresent, ILogger<GameWorld> logger, RealmManager? manager = null) : base(manager)
+        public GameWorld(int mapId, string name, bool oryxPresent, RealmManager manager,
+            ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache, IEventBus eventBus) 
+            : base(manager, logger, portalMonitor, generatorCache)
         {
             _displayName = name;
             Name = name;
@@ -34,6 +38,7 @@ namespace wServer.realm.worlds
             _oryxPresent = oryxPresent;
             _mapId = mapId;
             Logger = logger;
+            EventBus = eventBus;
         }
 
         /// <summary>
@@ -52,7 +57,8 @@ namespace wServer.realm.worlds
                 .ConfigureAwait(false);
 
             Overseer = _oryxPresent ? new Oryx(this) : null;
-
+            
+            EventBus.Publish(new WorldEvents.WorldCreatedEvent(this));
             Logger.LogInformation("Game World initialized.");
         }
 
@@ -75,6 +81,7 @@ namespace wServer.realm.worlds
             var world = gameWorldFactory.Create(mapId, name, oryxPresent);
             
             await world.InitAsync();
+            
             return world;
         }
 

@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
@@ -9,7 +10,7 @@ using wServer.realm;
 
 namespace wServer.networking.handlers
 {
-    internal class TeleportHandler : PacketHandlerBase<TeleportPacket>
+    internal class TeleportHandler(IServiceProvider serviceProvider) : PacketHandlerBase<TeleportPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -22,7 +23,7 @@ namespace wServer.networking.handlers
 
             client.Manager.Logic.AddPendingAction(t => client.Player.Teleport(t, packet),
                 PendingPriority.Networking);
-            
+
             return Task.CompletedTask;
         }
     }

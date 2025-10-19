@@ -1,8 +1,11 @@
-﻿namespace wServer.realm.worlds
+﻿using Microsoft.Extensions.Logging;
+using wServer;
+
+namespace wServer.realm.worlds
 {
     public class ClothBazaar : World
     {
-        public ClothBazaar(RealmManager manager) : base(manager)
+        public ClothBazaar(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Id = MARKET;
             Name = "Cloth Bazaar";

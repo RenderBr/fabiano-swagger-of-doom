@@ -3,7 +3,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using db;
+using Microsoft.Extensions.Logging;
 using MySqlConnector;
+using wServer;
 using wServer.networking;
 using wServer.realm.entities;
 using wServer.realm.entities.player;
@@ -16,7 +18,8 @@ namespace wServer.realm.worlds
     {
         private readonly Player player;
 
-        public PetYard(Player player, RealmManager manager = null) : base(manager ?? player.Manager)
+        public PetYard(Player player, RealmManager manager = null, ILogger<World> logger = null,
+            RealmPortalMonitor portalMonitor = null, GeneratorCache generatorCache = null) : base(manager ?? player.Manager, logger, portalMonitor, generatorCache)
         {
             this.player = player;
             Name = "Pet Yard";

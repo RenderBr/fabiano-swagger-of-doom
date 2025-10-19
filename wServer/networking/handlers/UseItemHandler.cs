@@ -18,7 +18,7 @@ using wServer.realm.entities.player;
 
 namespace wServer.networking.handlers
 {
-    internal class UseItemHandler : PacketHandlerBase<UseItemPacket>
+    internal class UseItemHandler(IServiceProvider serviceProvider) : PacketHandlerBase<UseItemPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -29,11 +29,11 @@ namespace wServer.networking.handlers
         {
             if (client.Player.Owner == null) return Task.CompletedTask; // Player not loaded or disconnected
 
-            var log = Program.Services.GetRequiredService<ILogger<UseItemHandler>>();
+            var log = ServiceProvider.GetRequiredService<ILogger<UseItemHandler>>();
             client.Manager.Logic.AddPendingAction(t =>
             {
                 var container = client.Player.Owner.GetEntity(packet.SlotObject.ObjectId) as IContainer;
-                if(container == null) return;
+                if (container == null) return;
                 Item item;
                 switch (packet.SlotObject.SlotId)
                 {
@@ -42,11 +42,13 @@ namespace wServer.networking.handlers
 
                         if (item.ObjectId != "Health Potion")
                         {
-                            log.LogCritical("Cheat engine detected for player {PlayerName},\nItem should be a Health Potion, but its {ObjectID}.",
+                            log.LogCritical(
+                                "Cheat engine detected for player {PlayerName},\nItem should be a Health Potion, but its {ObjectID}.",
                                 client.Player.Name, item.ObjectId);
                             foreach (Player player in client.Player.Owner.Players.Values)
                                 if (player.Client.Account.Rank >= 2)
-                                    player.SendInfo(String.Format("Cheat engine detected for player {0},\nItem should be a Health Potion, but its {1}.",
+                                    player.SendInfo(String.Format(
+                                        "Cheat engine detected for player {0},\nItem should be a Health Potion, but its {1}.",
                                         client.Player.Name, item.ObjectId));
                             client.Disconnect();
                             return;
@@ -66,6 +68,7 @@ namespace wServer.networking.handlers
                                             client.Player.HpPotionPrice = 5;
                                             client.Player.HpFirstPurchaseTime = false;
                                         }
+
                                         client.Player.HpPotionPrice = 10;
                                         break;
                                     case 10:
@@ -95,6 +98,7 @@ namespace wServer.networking.handlers
                                     case 600:
                                         break;
                                 }
+
                                 client.Player.Owner.Timers.Add(new WorldTimer(8000, (world, j) =>
                                 {
                                     switch (client.Player.HpPotionPrice)
@@ -133,22 +137,27 @@ namespace wServer.networking.handlers
                                 }));
                                 client.Manager.Database.DoActionAsync(db =>
                                 {
-                                    client.Player.Credits = client.Account.Credits = db.UpdateCredit(client.Account, -client.Player.HpPotionPrice);
+                                    client.Player.Credits = client.Account.Credits =
+                                        db.UpdateCredit(client.Account, -client.Player.HpPotionPrice);
                                 });
                                 client.Character.HitPoints += 100;
                                 client.Player.SaveToCharacter();
                             }
                         }
+
                         break;
                     case 255:
                         item = client.Player.Manager.GameDataService.Items[packet.SlotObject.ObjectType];
 
                         if (item.ObjectId != "Magic Potion")
                         {
-                            log.LogCritical("Cheat engine detected for player {Playername},\nItem should be a Magic Potion, but its {ObjectId}.",
+                            log.LogCritical(
+                                "Cheat engine detected for player {Playername},\nItem should be a Magic Potion, but its {ObjectId}.",
                                 client.Player.Name, item.ObjectId);
-                            foreach (var player in client.Player.Owner.Players.Values.Where(player => player.Client.Account.Rank >= 2))
-                                player.SendInfo($"Cheat engine detected for player {client.Player.Name},\nItem should be a Magic Potion, but its {item.ObjectId}.");
+                            foreach (var player in client.Player.Owner.Players.Values.Where(player =>
+                                         player.Client.Account.Rank >= 2))
+                                player.SendInfo(
+                                    $"Cheat engine detected for player {client.Player.Name},\nItem should be a Magic Potion, but its {item.ObjectId}.");
                             client.Disconnect();
                             return;
                         }
@@ -167,6 +176,7 @@ namespace wServer.networking.handlers
                                             client.Player.MpPotionPrice = 5;
                                             client.Player.MpFirstPurchaseTime = false;
                                         }
+
                                         client.Player.MpPotionPrice = 10;
                                         break;
                                     case 10:
@@ -196,6 +206,7 @@ namespace wServer.networking.handlers
                                     case 600:
                                         break;
                                 }
+
                                 client.Player.Owner.Timers.Add(new WorldTimer(10000, (world, j) =>
                                 {
                                     switch (client.Player.MpPotionPrice)
@@ -234,17 +245,20 @@ namespace wServer.networking.handlers
                                 }));
                                 client.Manager.Database.DoActionAsync(db =>
                                 {
-                                    client.Player.Credits = client.Account.Credits = db.UpdateCredit(client.Account, -client.Player.MpPotionPrice);
+                                    client.Player.Credits = client.Account.Credits =
+                                        db.UpdateCredit(client.Account, -client.Player.MpPotionPrice);
                                 });
                                 client.Character.MagicPoints += 100;
                                 client.Player.SaveToCharacter();
                             }
                         }
+
                         break;
                     default:
                         item = container.Inventory[packet.SlotObject.SlotId];
                         break;
                 }
+
                 if (item != null)
                 {
                     if (!client.Player.Activate(t, item, packet))
@@ -277,7 +291,7 @@ namespace wServer.networking.handlers
                             {
                                 Manager.Database.DoActionAsync(async db =>
                                 {
-                                        var acc = await db.GetAccount((int)client.Account.Id);
+                                    var acc = await db.GetAccount((int)client.Account.Id);
                                     // Remove gift logic would need to be implemented
                                     // For now, just a placeholder
                                 });
@@ -285,6 +299,7 @@ namespace wServer.networking.handlers
                         }
                     }
                 }
+
                 if (packet.SlotObject.SlotId != 254 && packet.SlotObject.SlotId != 255)
                     if (container.SlotTypes[packet.SlotObject.SlotId] != -1)
                         client.Player.FameCounter.UseAbility();
@@ -294,7 +309,7 @@ namespace wServer.networking.handlers
                 client.Player.SaveToCharacter();
                 client.Save();
             }, PendingPriority.Networking);
-            
+
             return Task.CompletedTask;
         }
     }

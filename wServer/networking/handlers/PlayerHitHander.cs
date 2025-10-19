@@ -11,7 +11,7 @@ using wServer.realm.entities;
 
 namespace wServer.networking.handlers
 {
-    internal class PlayerHitHander : PacketHandlerBase<PlayerHitPacket>
+    internal class PlayerHitHander(IServiceProvider serviceProvider) : PacketHandlerBase<PlayerHitPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -26,7 +26,7 @@ namespace wServer.networking.handlers
 
         private void Handle(Client client, PlayerHitPacket packet)
         {
-            var log = Program.Services.GetRequiredService<ILogger<PlayerHitHander>>();
+            var log = ServiceProvider.GetRequiredService<ILogger<PlayerHitHander>>();
             try
             {
                 if (client.Player.Owner != null)

@@ -18,7 +18,8 @@ using FailurePacket = wServer.networking.svrPackets.FailurePacket;
 
 namespace wServer.networking.handlers
 {
-    internal class CreateHandler : PacketHandlerBase<CreatePacket>
+    internal class CreateHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<CreatePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -27,9 +28,9 @@ namespace wServer.networking.handlers
 
         protected override async Task HandlePacket(Client client, CreatePacket packet)
         {
-            await using var scope = Program.Services.CreateAsyncScope();
-            var characterRepository = scope.ServiceProvider.GetRequiredService<ICharacterRepository>();
-            var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+            var characterRepository = serviceProvider.GetRequiredService<ICharacterRepository>();
+            var unitOfWork = serviceProvider.GetRequiredService<IUnitOfWork>();
+            var logger = serviceProvider.GetRequiredService<ILogger<CreateHandler>>();
 
             int nextCharId = 1;
             if (!client.Account.IsGuestAccount)
@@ -66,17 +67,18 @@ namespace wServer.networking.handlers
 
             var newCharacter = Program.Services.GetRequiredService<CharacterCreationService>()
                 .Create((ushort)packet.ClassType, nextCharId, skin);
-            
+
             newCharacter.AccountId = long.Parse(client.Account.AccountId);
-            
+
             try
             {
                 await characterRepository.AddAsync(newCharacter);
                 await unitOfWork.SaveChangesAsync();
 
                 client.Character = Char.FromCharacter(newCharacter);
-                Program.Logger.LogInformation(
-                    "Created character {CharacterId} for account {AccountName}", client.Character.CharacterId, client.Account.Name);
+                logger.LogInformation(
+                    "Created character {CharacterId} for account {AccountName}", client.Character.CharacterId,
+                    client.Account.Name);
 
                 var target = client.Manager.Worlds[client.TargetWorld];
                 var player = new Player(client.Manager, client);
@@ -92,7 +94,8 @@ namespace wServer.networking.handlers
             }
             catch (Exception ex)
             {
-                Program.Logger.LogError(ex,"Error creating character for account: {AccountID}", client.Account.AccountId);
+                logger.LogError(ex, "Error creating character for account: {AccountID}",
+                    client.Account.AccountId);
                 client.SendPacket(new FailurePacket
                 {
                     ErrorDescription = "Failed to Load character."

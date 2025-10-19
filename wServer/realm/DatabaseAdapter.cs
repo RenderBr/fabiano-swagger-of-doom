@@ -20,6 +20,7 @@ namespace wServer.realm
         {
             this.logger = logger;
             this.unitOfWork = unitOfWork;
+            logger.LogInformation("DatabaseAdapter initialized.");
         }
 
         // Execute legacy action pattern (sync or async) in a unified way

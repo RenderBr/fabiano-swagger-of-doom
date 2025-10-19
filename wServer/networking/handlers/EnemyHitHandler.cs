@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
@@ -10,7 +11,8 @@ using wServer.realm.entities;
 
 namespace wServer.networking.handlers
 {
-    internal class EnemyHitHandler : PacketHandlerBase<EnemyHitPacket>
+    internal class EnemyHitHandler(IServiceProvider serviceProvider)
+        : PacketHandlerBase<EnemyHitPacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -31,7 +33,7 @@ namespace wServer.networking.handlers
                         prj.ForceHit(entity, t);
                 }
             }, PendingPriority.Networking);
-            
+
             return Task.CompletedTask;
         }
     }

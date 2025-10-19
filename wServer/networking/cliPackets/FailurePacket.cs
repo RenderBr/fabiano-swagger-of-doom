@@ -25,7 +25,6 @@ namespace wServer.networking.cliPackets
 
         protected override void Write(Client psr, NWriter wtr)
         {
-            Program.Logger.LogWarning("Sending FailurePacket: {ErrorId} - {ErrorDescription}", ErrorId, ErrorDescription);
             wtr.Write(ErrorId);
             wtr.WriteUTF(ErrorDescription);
         }

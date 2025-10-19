@@ -2,7 +2,9 @@
 
 using System.Collections.Generic;
 using System.IO;
+using Microsoft.Extensions.Logging;
 using RageRealm.Shared.Models;
+using wServer;
 using wServer.realm.entities.player;
 using wServer.realm.terrain;
 
@@ -14,7 +16,7 @@ namespace wServer.realm.worlds
     {
         public string js = null;
 
-        public Test(RealmManager manager) : base(manager)
+        public Test(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Id = TEST_ID;
             Name = "Test";

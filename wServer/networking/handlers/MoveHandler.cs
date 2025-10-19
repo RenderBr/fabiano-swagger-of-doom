@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using System.Threading.Tasks;
 using RageRealm.Shared.Models;
 using wServer.networking.cliPackets;
@@ -10,7 +11,7 @@ using wServer.realm.entities.player;
 
 namespace wServer.networking.handlers
 {
-    internal class MoveHandler : PacketHandlerBase<MovePacket>
+    internal class MoveHandler(IServiceProvider serviceProvider) : PacketHandlerBase<MovePacket>(serviceProvider)
     {
         public override PacketID ID
         {
@@ -30,12 +31,13 @@ namespace wServer.networking.handlers
 
                 double newX = client.Player.X;
                 double newY = client.Player.Y;
-                
+
                 if (newX != packet.Position.X)
                 {
                     newX = packet.Position.X;
                     client.Player.UpdateCount++;
                 }
+
                 if (newY != packet.Position.Y)
                 {
                     newY = packet.Position.Y;
@@ -53,13 +55,13 @@ namespace wServer.networking.handlers
 
         private static void CheckLabConditions(Entity player, MovePacket packet)
         {
-            var tile = player.Owner.Map[(int) packet.Position.X, (int) packet.Position.Y];
+            var tile = player.Owner.Map[(int)packet.Position.X, (int)packet.Position.Y];
             switch (tile.TileId)
             {
                 //Green water
                 case 0xa9:
                 case 0x82:
-                    if(tile.ObjId != 0) return;
+                    if (tile.ObjId != 0) return;
                     if (!player.HasConditionEffect(ConditionEffectIndex.Hexed) ||
                         !player.HasConditionEffect(ConditionEffectIndex.Stunned) ||
                         !player.HasConditionEffect(ConditionEffectIndex.Speedy))
@@ -68,6 +70,7 @@ namespace wServer.networking.handlers
                         player.ApplyConditionEffect(ConditionEffectIndex.Stunned);
                         player.ApplyConditionEffect(ConditionEffectIndex.Speedy);
                     }
+
                     break;
                 //Blue water
                 case 0xa7:
@@ -81,6 +84,7 @@ namespace wServer.networking.handlers
                         player.ApplyConditionEffect(ConditionEffectIndex.Stunned, 0);
                         player.ApplyConditionEffect(ConditionEffectIndex.Speedy, 0);
                     }
+
                     break;
             }
         }

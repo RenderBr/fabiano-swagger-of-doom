@@ -1,5 +1,7 @@
 ﻿#region
 
+using Microsoft.Extensions.Logging;
+using wServer;
 using wServer.networking;
 
 #endregion
@@ -8,7 +10,7 @@ namespace wServer.realm.worlds
 {
     public class TheShatters : World
     {
-        public TheShatters(RealmManager manager) : base(manager)
+        public TheShatters(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Name = "The Shatters";
             ClientWorldName = "shatters.The_Shatters";
@@ -32,7 +34,7 @@ namespace wServer.realm.worlds
 
         public override World GetInstance(Client psr)
         {
-            return Manager.AddWorld(new TheShatters(Manager));
+            return Manager.AddWorld(new TheShatters(Manager, _logger, _portalMonitor, _generatorCache));
         }
 
         public void CloseBridge1()

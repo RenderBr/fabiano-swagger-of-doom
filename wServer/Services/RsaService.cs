@@ -13,26 +13,9 @@ using Org.BouncyCastle.OpenSsl;
 
 namespace wServer
 {
-    public class RSA
+    public class RsaService
     {
-        public static readonly RSA Instance = new RSA(@"
------BEGIN RSA PRIVATE KEY-----
-MIICXAIBAAKBgQCbqweYUxzW0IiCwuBAzx6HtskrhWW+B0iX4LMu2xqRh4gh52HU
-Vu9nNiXso7utTKCv/HNK19v5xoWp3Cne23sicp2oVGgKMFSowBFbtr+fhsq0yHv+
-JxixkL3WLnXcY3xREz7LOzVMoybUCmJzzhnzIsLPiIPdpI1PxFDcnFbdRQIDAQAB
-AoGAbjGLltB+wbGscKPyiu4S9o71qNEtTG9re9eb/7cp/4qpWxanseA4aB90iSb+
-W5a6yNkz4+8Z0J4vUCaBnThQ2Nyoj4B6HUJpih6f9NbcaqTj/8zibr1YyeEzo4rw
-dO1ptPb9y5Pv8DOAInEb3NhqitLBRm1jguxpK9Ybbnob2QECQQDjpAmsqxk2w0Q0
-IgMlx5Cn9uE/iTXaEuqoYRRig2TH7zhzsoll3XfLyuBdkm0tSyUrA4+V7wYXjCoU
-dEEHhzhJAkEArw+gGzbAWHzLwgvBru/WtceSdaT6XPYyp+xssSD0BYIL8xmkIsyS
-0x6Oh99Ec9Ov1M4qGliJlxdZ3vgVyiuVHQJBAJWXh5ADg/c7zIchzsW15jaqgw0Y
-ot3iznfGC/pM9B568rL9IVNifUXb1SNIhRxdpFgm5+WUhIFW55Q3bUCAOJkCQBah
-VnkuIr9Noql7C5apun/VRMGgihzqVrIOhh5/vAvaO+E5N1aoS3KvSI2X9ylh/CDu
-ZdLyDxdRFXUVbPutlqECQE+4PbsqiekYX4BWRTAnOy5Ly+/ivTWOWNJxHicuNu8i
-0zLn+R6ZamUkKcQI5N/91TGJvkIKXRJTYcII+w5gSdw=
------END RSA PRIVATE KEY-----");
-
-/*        
+/*
 -----BEGIN PUBLIC KEY-----
 MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCbqweYUxzW0IiCwuBAzx6Htskr
 hWW+B0iX4LMu2xqRh4gh52HUVu9nNiXso7utTKCv/HNK19v5xoWp3Cne23sicp2o
@@ -43,10 +26,29 @@ iIPdpI1PxFDcnFbdRQIDAQAB
 
         private readonly RsaEngine engine;
         private readonly AsymmetricKeyParameter key;
+        private readonly ILogger<RsaService> logger;
 
-        private RSA(string privPem)
+        public RsaService(ILogger<RsaService> logger)
         {
-            key = (new PemReader(new StringReader(privPem.Trim())).ReadObject() as AsymmetricCipherKeyPair).Private;
+            this.logger = logger;
+            var keyString = @"
+                -----BEGIN RSA PRIVATE KEY-----
+                MIICXAIBAAKBgQCbqweYUxzW0IiCwuBAzx6HtskrhWW+B0iX4LMu2xqRh4gh52HU
+                Vu9nNiXso7utTKCv/HNK19v5xoWp3Cne23sicp2oVGgKMFSowBFbtr+fhsq0yHv+
+                JxixkL3WLnXcY3xREz7LOzVMoybUCmJzzhnzIsLPiIPdpI1PxFDcnFbdRQIDAQAB
+                AoGAbjGLltB+wbGscKPyiu4S9o71qNEtTG9re9eb/7cp/4qpWxanseA4aB90iSb+
+                W5a6yNkz4+8Z0J4vUCaBnThQ2Nyoj4B6HUJpih6f9NbcaqTj/8zibr1YyeEzo4rw
+                dO1ptPb9y5Pv8DOAInEb3NhqitLBRm1jguxpK9Ybbnob2QECQQDjpAmsqxk2w0Q0
+                IgMlx5Cn9uE/iTXaEuqoYRRig2TH7zhzsoll3XfLyuBdkm0tSyUrA4+V7wYXjCoU
+                dEEHhzhJAkEArw+gGzbAWHzLwgvBru/WtceSdaT6XPYyp+xssSD0BYIL8xmkIsyS
+                0x6Oh99Ec9Ov1M4qGliJlxdZ3vgVyiuVHQJBAJWXh5ADg/c7zIchzsW15jaqgw0Y
+                ot3iznfGC/pM9B568rL9IVNifUXb1SNIhRxdpFgm5+WUhIFW55Q3bUCAOJkCQBah
+                VnkuIr9Noql7C5apun/VRMGgihzqVrIOhh5/vAvaO+E5N1aoS3KvSI2X9ylh/CDu
+                ZdLyDxdRFXUVbPutlqECQE+4PbsqiekYX4BWRTAnOy5Ly+/ivTWOWNJxHicuNu8i
+                0zLn+R6ZamUkKcQI5N/91TGJvkIKXRJTYcII+w5gSdw=
+                -----END RSA PRIVATE KEY-----";
+
+            key = (new PemReader(new StringReader(keyString.Trim())).ReadObject() as AsymmetricCipherKeyPair).Private;
             engine = new RsaEngine();
             engine.Init(true, key);
         }
@@ -61,10 +63,11 @@ iIPdpI1PxFDcnFbdRQIDAQAB
                 Pkcs1Encoding encoding = new Pkcs1Encoding(engine);
                 encoding.Init(false, key);
                 return Encoding.UTF8.GetString(encoding.ProcessBlock(dat, 0, dat.Length));
-            }catch(Exception e)
+            }
+            catch (Exception e)
             {
-                Program.Logger.LogError(e,"RSA Decrypt error");
-                Program.Logger.LogError("Data: {Data} ", str);
+                logger.LogError(e, "RSA Decrypt error");
+                logger.LogError("Data: {Data} ", str);
                 return null;
             }
         }

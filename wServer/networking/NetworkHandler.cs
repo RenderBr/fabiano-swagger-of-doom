@@ -18,7 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace wServer.networking
 {
-    internal class NetworkHandler : IDisposable
+    public class NetworkHandler : IDisposable
     {
         private readonly ILogger<NetworkHandler> _logger;
         private const int HEADER_SIZE = 5;
@@ -32,7 +32,7 @@ namespace wServer.networking
         public bool _isRunning = true;
         private bool _disposed;
 
-        public NetworkHandler(Client parent, Socket socket)
+        public NetworkHandler(IServiceProvider serviceProvider, Client parent, Socket socket)
         {
             _logger = Program.Services?.GetRequiredService<ILogger<NetworkHandler>>();
             this.parent = parent;
@@ -105,9 +105,6 @@ namespace wServer.networking
                     var packetId = buffer[4];
 
                     int bodyLen = totalLen - HEADER_SIZE;
-                    _logger?.LogDebug("Header => totalLen={bodyLen}, packetId={packetId}, available={available}",
-                        bodyLen, packetId, socket.Available);
-
                     if (bodyLen is < 0 or > BUFFER_SIZE)
                     {
                         _logger?.LogError("Invalid packet length {bodyLen} from {endPoint}",
@@ -142,8 +139,8 @@ namespace wServer.networking
                         if (!Client.ExcludePacketsFromLogging.Contains((PacketID)packetId))
                         {
                             _logger?.LogInformation(
-                                "Received {packetId} ({packetType}) [{bodyLen} bytes] from {endPoint}",
-                                packetId, packet.GetType().Name, bodyLen, socket.RemoteEndPoint);
+                                "Received {packetId} ({packetType}) from {endPoint}",
+                                packetId, packet.GetType().Name, socket.RemoteEndPoint);
                         }
 
                         if (parent.IsReady())
@@ -210,8 +207,6 @@ namespace wServer.networking
                     }
 
                     total += read;
-                    _logger?.LogDebug("ReceiveExactAsync read {read} bytes ({total}/{bufferLength})",
-                        read, total, buffer.Length);
                 }
             }
             catch (Exception ex)
