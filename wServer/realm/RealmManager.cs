@@ -109,7 +109,7 @@ namespace wServer.realm
             var nexus = new Nexus(this, _worldLogger, _portalMonitor, GeneratorCache);
             AddWorld(World.NEXUS_ID, Worlds[0] = nexus);
             _portalMonitor.SetNexus(nexus);
-            
+
             AddWorld(World.MARKET, new ClothBazaar(this, _worldLogger, _portalMonitor, GeneratorCache));
             AddWorld(World.TEST_ID, new Test(this, _worldLogger, _portalMonitor, GeneratorCache));
             AddWorld(World.TUT_ID, new Tutorial(true, this, _worldLogger, _portalMonitor, GeneratorCache));
@@ -120,7 +120,7 @@ namespace wServer.realm
                 try
                 {
                     await nexus.InitAsync().ConfigureAwait(false);
-                    
+
                     var world = await GameWorld.AutoNameAsync(1, true).ConfigureAwait(false);
                     await AddWorldAsync(world);
                 }
@@ -144,13 +144,24 @@ namespace wServer.realm
             Network = new NetworkTicker(this);
             Logic = new LogicTicker(this);
 
-            // run both tickers as background tasks
-            _networkTask = Task.Run(async () => await Network.TickLoop(_cts.Token));
-            _logicTask = Task.Run(() => Logic.TickLoop(_cts.Token));
+            _networkTask = Task.Factory.StartNew(
+                () => Network.TickLoop(_cts.Token),
+                _cts.Token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default
+            );
+
+            _logicTask = Task.Factory.StartNew(
+                () => Logic.TickLoop(_cts.Token),
+                _cts.Token,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default
+            );
 
             _logger.LogInformation("Realm Manager started.");
             await Task.CompletedTask;
         }
+
 
         public async Task CloseWorldAsync(World world)
         {
@@ -237,10 +248,24 @@ namespace wServer.realm
             }
 
             psr.Id = Interlocked.Increment(ref _nextClientId);
-            if (Clients.ContainsKey(psr.Account.AccountId) && !Clients[psr.Account.AccountId].Socket.Connected)
+            if (Clients.TryGetValue(psr.Account.AccountId, out var existing))
             {
-                _logger.LogInformation("Removing disconnected client {AccountName}.", psr.Account.Name);
-                Clients.TryRemove(psr.Account.AccountId, out _);
+                var existingSocketConnected = existing.Socket?.Connected ?? false;
+                var canReplace = existing.Reconnecting
+                                   || existing.Stage == ProtocalStage.Disconnected
+                                   || !existingSocketConnected;
+
+                if (canReplace)
+                {
+                    _logger.LogInformation("Replacing stale client session for {AccountName}.", psr.Account.Name);
+                    Clients.TryRemove(psr.Account.AccountId, out _);
+                }
+                else
+                {
+                    _logger.LogInformation("Kicking {AccountName} because account is already connected.",
+                        psr.Account.Name);
+                    return false;
+                }
             }
 
             _logger.LogInformation("Client {AccountName} connected.", psr.Account.Name);
@@ -271,6 +296,7 @@ namespace wServer.realm
             world.Id = Interlocked.Increment(ref _nextWorldId);
             Worlds[world.Id] = world;
             OnWorldAdded(world);
+            await world.InitAsync();
             return await Task.FromResult(world);
         }
 
@@ -332,7 +358,8 @@ namespace wServer.realm
         {
             if (!_vaults.TryGetValue(processor.Account.AccountId, out var v))
             {
-                v = (GameVault)AddWorld(new GameVault(false, processor));
+                var vault = new GameVault(false, processor, this, _worldLogger, _portalMonitor, GeneratorCache);
+                v = (GameVault)AddWorld(vault);
                 _vaults.TryAdd(processor.Account.AccountId, v);
             }
             else

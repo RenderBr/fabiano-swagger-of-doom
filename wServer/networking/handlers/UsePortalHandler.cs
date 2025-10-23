@@ -68,9 +68,8 @@ namespace wServer.networking.handlers
                         case 0x070d:
                         case 0x070e:
                         {
-                            if (client.Player.Manager.LastWorld.ContainsKey(client.Player.AccountId))
+                            if (client.Player.Manager.LastWorld.TryGetValue(client.Player.AccountId, out var w))
                             {
-                                World w = client.Player.Manager.LastWorld[client.Player.AccountId];
                                 if (w != null && client.Player.Manager.Worlds.ContainsKey(w.Id))
                                     world = w;
                                 else
@@ -117,6 +116,7 @@ namespace wServer.networking.handlers
                                 try
                                 {
                                     world = await worldFactory.CreateWorldAsync(worldType);
+                                    await world.InitAsync();
                                 }
                                 catch (Exception ex)
                                 {

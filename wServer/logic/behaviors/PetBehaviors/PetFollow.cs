@@ -80,8 +80,8 @@ namespace wServer.logic.behaviors.PetBehaviors
 
                         Status = CycleStatus.InProgress;
                         vect.Normalize();
-                        host.ValidateAndMove(host.X + vect.X * dist, host.Y + vect.Y * dist);
-                        host.UpdateCount++;
+                        if (host.ValidateAndMove(host.X + vect.X * dist, host.Y + vect.Y * dist))
+                            host.UpdateCount++;
                     }
 
                     break;

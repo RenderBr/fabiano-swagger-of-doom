@@ -62,8 +62,8 @@ namespace wServer.logic.behaviors
                     Status = CycleStatus.Completed;
                 }
                 float dist = host.GetSpeed(speed)*(time.thisTickTimes/1000f);
-                host.ValidateAndMove(host.X + storage.Direction.X*dist, host.Y + storage.Direction.Y*dist);
-                host.UpdateCount++;
+                if (host.ValidateAndMove(host.X + storage.Direction.X * dist, host.Y + storage.Direction.Y * dist))
+                    host.UpdateCount++;
 
                 storage.RemainingDistance -= dist;
             }

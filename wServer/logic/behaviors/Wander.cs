@@ -1,5 +1,6 @@
 ﻿#region
 
+using System;
 using Mono.Game;
 using RageRealm.Shared.Models;
 using wServer.realm;
@@ -23,39 +24,43 @@ namespace wServer.logic.behaviors
 
         protected override void TickCore(Entity host, RealmTime time, ref object state)
         {
-            WanderStorage storage;
-            if (state == null) storage = new WanderStorage();
-            else storage = (WanderStorage) state;
+            var storage = state as WanderStorage ?? new WanderStorage();
 
-            Status = CycleStatus.NotStarted;
-
-            if (host.HasConditionEffect(ConditionEffectIndex.Paralyzed)) return;
-
-            Status = CycleStatus.InProgress;
-            if (storage.RemainingDistance <= 0)
+            if (host.HasConditionEffect(ConditionEffectIndex.Paralyzed))
             {
-                storage.Direction = new Vector2(Random.Next(-1, 2), Random.Next(-1, 2));
-                storage.Direction.Normalize();
-                storage.RemainingDistance = period.Next(Random)/1000f;
-                Status = CycleStatus.Completed;
+                Status = CycleStatus.NotStarted;
+                return;
             }
 
-            //var en = host.GetNearestEntity(20, null);
-            //var player = en as Player;
+            if (storage.RemainingDistance <= 0)
+            {
+                Vector2 direction;
+                do
+                {
+                    direction = new Vector2(Random.Next(-1, 2), Random.Next(-1, 2));
+                } while (direction.LengthSquared() < float.Epsilon);
 
-            //if(en == null)
-            //{
-            //    return;
-            //}
+                direction.Normalize();
+                storage.Direction = direction;
 
-            float dist = host.GetSpeed(speed)*(time.thisTickTimes/1000f);
-            host.ValidateAndMove(host.X + storage.Direction.X*dist, host.Y + storage.Direction.Y*dist);
-            host.UpdateCount++;
+                // distance to travel before picking a new direction
+                var travelSeconds = period.Next(Random) / 1000f;
+                storage.RemainingDistance = MathF.Max(0.1f, host.GetSpeed(speed) * travelSeconds);
+                Status = CycleStatus.Completed;
+            }
+            else
+            {
+                Status = CycleStatus.InProgress;
+            }
+
+            float dist = host.GetSpeed(speed) * (time.thisTickTimes / 1000f);
+            if (host.ValidateAndMove(host.X + storage.Direction.X * dist, host.Y + storage.Direction.Y * dist))
+                host.UpdateCount++;
 
             storage.RemainingDistance -= dist;
-
             state = storage;
         }
+
 
         private class WanderStorage
         {

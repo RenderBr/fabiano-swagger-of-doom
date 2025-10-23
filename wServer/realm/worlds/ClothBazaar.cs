@@ -3,9 +3,10 @@ using wServer;
 
 namespace wServer.realm.worlds
 {
-    public class ClothBazaar : World
+    public sealed class ClothBazaar : World
     {
-        public ClothBazaar(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor, GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
+        public ClothBazaar(RealmManager manager, ILogger<World> logger, RealmPortalMonitor portalMonitor,
+            GeneratorCache generatorCache) : base(manager, logger, portalMonitor, generatorCache)
         {
             Id = MARKET;
             Name = "Cloth Bazaar";
@@ -13,6 +14,8 @@ namespace wServer.realm.worlds
             Background = 2;
             AllowTeleport = false;
             Difficulty = 0;
+            
+            Init();
         }
 
         protected override void Init()

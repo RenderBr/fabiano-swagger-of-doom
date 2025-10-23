@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using db;
 using Microsoft.Extensions.Logging;
 using MySqlConnector;
@@ -14,12 +15,13 @@ using wServer.realm.entities.player;
 
 namespace wServer.realm.worlds
 {
-    public class PetYard : World
+    public sealed class PetYard : World
     {
         private readonly Player player;
 
         public PetYard(Player player, RealmManager manager = null, ILogger<World> logger = null,
-            RealmPortalMonitor portalMonitor = null, GeneratorCache generatorCache = null) : base(manager ?? player.Manager, logger, portalMonitor, generatorCache)
+            RealmPortalMonitor portalMonitor = null, GeneratorCache generatorCache = null) : base(
+            manager ?? player.Manager, logger, portalMonitor, generatorCache)
         {
             this.player = player;
             Name = "Pet Yard";
@@ -30,7 +32,7 @@ namespace wServer.realm.worlds
             AllowTeleport = false;
         }
 
-        protected override void Init()
+        public override async Task InitAsync()
         {
             string petYard = "wServer.realm.worlds.maps.PetYard_Common.wmap";
             switch (player.Client.Account.PetYardType)
@@ -42,19 +44,19 @@ namespace wServer.realm.worlds
                 case 5: petYard = "wServer.realm.worlds.maps.PetYard_Divine.wmap"; break;
             }
 
-            LoadMap(petYard, MapType.Wmap);
+            await LoadMapAsync(petYard, MapType.Wmap);
             LoadPetYardData(player);
         }
 
         private void LoadPetYardData(Player player)
         {
-                Manager.Database.DoActionAsync(async db =>
+            Manager.Database.DoActionAsync(async db =>
             {
                 List<PetItem> petData = new List<PetItem>();
 
-                    // Get pets for this account (excluding current pet)
-                    // Note: This needs proper implementation with pet repository
-                    // For now, leaving as placeholder since GetPet signature mismatch needs fixing
+                // Get pets for this account (excluding current pet)
+                // Note: This needs proper implementation with pet repository
+                // For now, leaving as placeholder since GetPet signature mismatch needs fixing
 
                 foreach (PetItem i in petData)
                 {
@@ -65,6 +67,7 @@ namespace wServer.realm.worlds
                         x = player.Random.Next(0, this.Map.Width);
                         y = player.Random.Next(0, this.Map.Height);
                     } while (this.Map[x, y].Region != TileRegion.PetRegion || this.Map[x, y].ObjType != 0);
+
                     obj.Move(x + 0.5f, y + 0.5f);
                     EnterWorld(obj);
                 }
@@ -86,6 +89,7 @@ namespace wServer.realm.worlds
                         return ret;
                 }
             }
+
             return ret;
         }
 

@@ -24,8 +24,8 @@ public static class DataServiceCollectionExtensions
             options.UseMySql(connString, ServerVersion.AutoDetect(connString));
         });
 
-        services.AddSingleton<IUnitOfWork, UnitOfWork>();
-        services.AddSingleton<DatabaseAdapter>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<DatabaseAdapter>();
         return services;
     }
 }

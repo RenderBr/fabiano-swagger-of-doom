@@ -33,10 +33,10 @@ namespace wServer.logic.behaviors
         {
             this.radius = radius;
             this.count = count;
-            this.shootAngle = count == 1 ? 0 : (shootAngle ?? 360.0/count)*Math.PI/180;
-            this.fixedAngle = fixedAngle*Math.PI/180;
-            this.angleOffset = angleOffset*Math.PI/180;
-            this.defaultAngle = defaultAngle*Math.PI/180;
+            this.shootAngle = count == 1 ? 0 : (shootAngle ?? 360.0 / count) * Math.PI / 180;
+            this.fixedAngle = fixedAngle * Math.PI / 180;
+            this.angleOffset = angleOffset * Math.PI / 180;
+            this.defaultAngle = defaultAngle * Math.PI / 180;
             this.projectileIndex = projectileIndex;
             this.predictive = predictive;
             this.coolDownOffset = coolDownOffset;
@@ -45,8 +45,18 @@ namespace wServer.logic.behaviors
 
         protected override void OnStateEntry(Entity host, RealmTime time, ref object state)
         {
-            state = coolDownOffset;
+            // convert initial ms cooldown offset to ticks (ensure positive offsets survive rounding)
+            if (coolDownOffset <= 0)
+            {
+                state = 0;
+            }
+            else
+            {
+                var ticks = (int)Math.Round(coolDownOffset / (float)host.Manager.Logic.MsPT);
+                state = ticks < 1 ? 1 : ticks;
+            }
         }
+
 
         private static double Predict(Entity host, Entity target, ProjectileDesc desc)
         {
@@ -66,41 +76,39 @@ namespace wServer.logic.behaviors
         protected override void TickCore(Entity host, RealmTime time, ref object state)
         {
             if (state == null) return;
-            int cool = (int) state;
+            int cool = (int)state;
             Status = CycleStatus.NotStarted;
 
             if (cool <= 0)
             {
-                if (host.HasConditionEffect(ConditionEffectIndex.Stunned)) return;
+                if (host.HasConditionEffect(ConditionEffectIndex.Stunned))
+                    return;
 
                 Entity player = host.GetNearestEntity(radius, null);
                 if (player != null || defaultAngle != null || fixedAngle != null)
                 {
                     ProjectileDesc desc = host.ObjectDesc.Projectiles[projectileIndex];
+                    double a = fixedAngle ?? (player == null
+                        ? defaultAngle.Value
+                        : Math.Atan2(player.Y - host.Y, player.X - host.X));
 
-                    double a = fixedAngle ??
-                               (player == null ? defaultAngle.Value : Math.Atan2(player.Y - host.Y, player.X - host.X));
                     a += angleOffset;
                     if (predictive != 0 && player != null)
-                        a += Predict(host, player, desc)*predictive;
+                        a += Predict(host, player, desc) * predictive;
 
-                    int dmg;
-                    if (host is Character)
-                        dmg = (host as Character).Random.Next(desc.MinDamage, desc.MaxDamage);
-                    else
-                        dmg = Random.Next(desc.MinDamage, desc.MaxDamage);
+                    int dmg = (host as Character)?.Random.Next(desc.MinDamage, desc.MaxDamage)
+                              ?? Random.Next(desc.MinDamage, desc.MaxDamage);
 
-                    double startAngle = a - shootAngle*(count - 1)/2;
+                    double startAngle = a - shootAngle * (count - 1) / 2;
                     byte prjId = 0;
-                    Position prjPos = new Position {X = host.X, Y = host.Y};
+                    Position prjPos = new Position { X = host.X, Y = host.Y };
                     for (int i = 0; i < count; i++)
                     {
                         Projectile prj = host.CreateProjectile(
-                            desc, host.ObjectType, dmg, time.tickTimes,
-                            prjPos, (float) (startAngle + shootAngle*i));
+                            desc, host.ObjectType, dmg, time.tickTimes, prjPos,
+                            (float)(startAngle + shootAngle * i));
                         host.Owner.EnterWorld(prj);
-                        if (i == 0)
-                            prjId = prj.ProjectileId;
+                        if (i == 0) prjId = prj.ProjectileId;
                     }
 
                     host.Owner.BroadcastPacket(new ShootPacket
@@ -112,15 +120,17 @@ namespace wServer.logic.behaviors
                         Damage = (short)dmg,
                         BulletType = (byte)desc.BulletType,
                         AngleInc = (float)shootAngle,
-                        NumShots = (byte)count,
+                        NumShots = (byte)count
                     }, null);
                 }
-                cool = coolDown.Next(Random);
+
+                // convert new cooldown (ms) → ticks
+                cool = coolDown.NextTicks(Random, host.Manager.Logic.MsPT);
                 Status = CycleStatus.Completed;
             }
             else
             {
-                cool -= time.thisTickTimes;
+                cool -= 1; // one tick passed
                 Status = CycleStatus.InProgress;
             }
 

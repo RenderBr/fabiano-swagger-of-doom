@@ -42,8 +42,8 @@ namespace wServer.logic.behaviors
             if (dist > 0)
             {
                 Status = CycleStatus.InProgress;
-                host.ValidateAndMove(host.X + moveDist, host.Y);
-                host.UpdateCount++;
+                if (host.ValidateAndMove(host.X + moveDist, host.Y))
+                    host.UpdateCount++;
                 dist -= moveDist;
                 if (dist <= 0)
                 {
@@ -54,8 +54,8 @@ namespace wServer.logic.behaviors
             else
             {
                 Status = CycleStatus.InProgress;
-                host.ValidateAndMove(host.X - moveDist, host.Y);
-                host.UpdateCount++;
+                if (host.ValidateAndMove(host.X - moveDist, host.Y))
+                    host.UpdateCount++;
                 dist += moveDist;
                 if (dist >= 0)
                 {

@@ -59,8 +59,8 @@ namespace wServer.logic.behaviors
             if (s.Direction != Vector2.Zero)
             {
                 float dist = host.GetSpeed(speed)*(time.thisTickTimes/1000f);
-                host.ValidateAndMove(host.X + s.Direction.X*dist, host.Y + s.Direction.Y*dist);
-                host.UpdateCount++;
+                if (host.ValidateAndMove(host.X + s.Direction.X * dist, host.Y + s.Direction.Y * dist))
+                    host.UpdateCount++;
                 Status = CycleStatus.InProgress;
             }
             s.RemainingTime -= time.thisTickTimes;

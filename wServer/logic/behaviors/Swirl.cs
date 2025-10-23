@@ -99,8 +99,8 @@ namespace wServer.logic.behaviors
             vect.Normalize();
             vect *= (float) spd*(time.thisTickTimes/1000f);
 
-            host.ValidateAndMove(host.X + vect.X, host.Y + vect.Y);
-            host.UpdateCount++;
+            if (host.ValidateAndMove(host.X + vect.X, host.Y + vect.Y))
+                host.UpdateCount++;
 
             Status = CycleStatus.InProgress;
 

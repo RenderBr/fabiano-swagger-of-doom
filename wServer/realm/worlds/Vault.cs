@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using db;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@ using wServer.realm.entities;
 
 namespace wServer.realm.worlds
 {
-    public class Vault : World
+    public sealed class Vault : World
     {
         private readonly ConcurrentDictionary<Tuple<Container, VaultChest>, int> _vaultChests =
             new ConcurrentDictionary<Tuple<Container, VaultChest>, int>();
@@ -41,10 +42,12 @@ namespace wServer.realm.worlds
                 AccountId = psr.Account != null ? psr.Account.AccountId : "-1";
             else
                 AccountId = "-1";
+
+            Init();
         }
 
         public string PlayerOwnerName { get; private set; }
-
+        
         protected override void Init()
         {
             if (!(IsLimbo = isLimbo))

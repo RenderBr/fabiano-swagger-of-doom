@@ -84,6 +84,8 @@ namespace wServer.networking
             PacketID.ENEMYSHOOT,
             PacketID.PLAYERSHOOT,
             PacketID.ALLYSHOOT,
+            PacketID.OTHERHIT,
+            PacketID.PLAYERHIT,
             PacketID.PONG
         ];
 

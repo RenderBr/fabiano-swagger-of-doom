@@ -5,7 +5,12 @@ using wServer.realm;
 
 namespace wServer.Factories;
 
-public class WorldFactory(RealmManager manager, ILogger<WorldFactory> logger) : IWorldFactory
+public class WorldFactory(
+    RealmManager manager,
+    ILogger<World> logger,
+    RealmPortalMonitor portalMonitor,
+    GeneratorCache generatorCache)
+    : IWorldFactory
 {
     public async Task<World> CreateWorldAsync(Type worldType)
     {
@@ -14,7 +19,7 @@ public class WorldFactory(RealmManager manager, ILogger<WorldFactory> logger) : 
 
         try
         {
-            var world = (World)Activator.CreateInstance(worldType);
+            var world = (World)Activator.CreateInstance(worldType, manager, logger, portalMonitor, generatorCache);
             if (world == null)
                 throw new InvalidOperationException($"Could not create an instance of {worldType.FullName}");
 

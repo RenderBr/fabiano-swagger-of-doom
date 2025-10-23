@@ -11,31 +11,30 @@ namespace server.sfx
 {
     internal class Sfx : RequestHandler
     {
-        protected override Task HandleRequest()
+        protected override async Task HandleRequest()
         {
-            string file = Context.Request.Url.LocalPath.StartsWith("/music")
-                ? "sfx/" + Context.Request.Url.LocalPath
-                : Context.Request.Url.LocalPath;
+            string localPath = Context.Request.Url.LocalPath.TrimStart('/');
+            string file = localPath.StartsWith("music", StringComparison.OrdinalIgnoreCase)
+                ? Path.Combine("sfx", localPath)
+                : localPath;
 
-            //context.Response.Redirect("http://realmofthemadgod.appspot.com/" + file);
+            string fullPath = Path.GetFullPath(file);
 
-            if (File.Exists(file))
+            if (File.Exists(fullPath))
             {
-                using (FileStream i = File.OpenRead(file))
-                {
-                    byte[] buff = new byte[i.Length];
-                    int c;
-                    while ((c = i.Read(buff, 0, buff.Length)) > 0)
-                        Context.Response.OutputStream.Write(buff, 0, c);
-                }
+                Context.Response.ContentType = "audio/mpeg";
+                Context.Response.ContentLength64 = new FileInfo(fullPath).Length;
+                await using var i = File.OpenRead(fullPath);
+                await i.CopyToAsync(Context.Response.OutputStream);
             }
             else
-                Context.Response.Redirect("http://realmofthemadgod.appspot.com/" +
-                                          (file.Split('/')[1].Contains("music")
-                                              ? file.Replace("sfx/", String.Empty)
-                                              : file));
-
-            return Task.CompletedTask;
+            {
+                string redirect = "http://realmofthemadgod.appspot.com/" +
+                                  (file.Contains("music", StringComparison.OrdinalIgnoreCase)
+                                      ? file.Replace("sfx/", "")
+                                      : file);
+                Context.Response.Redirect(redirect);
+            }
         }
     }
 }

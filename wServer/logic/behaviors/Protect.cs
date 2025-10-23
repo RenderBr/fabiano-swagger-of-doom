@@ -59,9 +59,9 @@ namespace wServer.logic.behaviors
                     {
                         Status = CycleStatus.InProgress;
                         vect.Normalize();
-                        float dist = host.GetSpeed(speed)*(time.thisTickTimes/1000f);
-                        host.ValidateAndMove(host.X + vect.X*dist, host.Y + vect.Y*dist);
-                        host.UpdateCount++;
+                        float dist = host.GetSpeed(speed) * (time.thisTickTimes / 1000f);
+                        if (host.ValidateAndMove(host.X + vect.X * dist, host.Y + vect.Y * dist))
+                            host.UpdateCount++;
                     }
                     else
                     {

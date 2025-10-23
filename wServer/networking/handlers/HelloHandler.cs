@@ -145,7 +145,11 @@ namespace wServer.networking.handlers
                 if (packet.GameId == World.NEXUS_LIMBO) packet.GameId = World.NEXUS_ID;
                 World world = client.Manager.GetWorld(packet.GameId);
                 if (world == null && packet.GameId == World.TUT_ID)
-                    world = client.Manager.AddWorld(new Tutorial(false, client.Manager, client.Manager.WorldLogger, client.Manager.PortalMonitor, client.Manager.GeneratorCache));
+                {
+                    world = await client.Manager.AddWorldAsync(new Tutorial(false, client.Manager, client.Manager.WorldLogger,
+                        client.Manager.PortalMonitor, client.Manager.GeneratorCache));
+                }
+
                 if (world == null)
                 {
                     client.SendPacket(new FailurePacket

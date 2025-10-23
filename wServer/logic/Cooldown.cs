@@ -36,6 +36,19 @@ namespace wServer.logic
             if (Variance == 0) return CoolDown;
             return CoolDown + rand.Next(-Variance, Variance + 1);
         }
+        
+        public int NextTicks(Random r, int msPerTick)
+        {
+            if (msPerTick <= 0)
+                return 0;
+
+            var interval = Next(r);
+            if (interval <= 0)
+                return 0;
+
+            var ticks = (int)Math.Round(interval / (float)msPerTick);
+            return ticks < 1 ? 1 : ticks;
+        }
 
         public static implicit operator Cooldown(int cooldown)
         {
